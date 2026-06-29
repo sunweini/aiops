@@ -122,6 +122,10 @@ class ZabbixClient:
 
         Uses ``lastvalue`` from ``item.get`` (no separate history.get needed).
         Supports both exact match and prefix match.
+
+        Special handling for CPU metrics:
+        - ``system.cpu.util[]`` (no params) = CPU usage
+        - ``system.cpu.util[,idle]`` = CPU idle (must be excluded)
         """
         items = self.get_host_items(hostid)
 
@@ -129,8 +133,16 @@ class ZabbixClient:
         for pattern in item_key_patterns:
             for item in items:
                 key = item["key_"]
+                # Special case: system.cpu.util[] must not match system.cpu.util[,idle]
+                if pattern == "system.cpu.util[]":
+                    if key == "system.cpu.util[]":
+                        result[pattern] = item.get("lastvalue", "N/A")
+                        break
                 # Exact match or prefix match
-                if key == pattern or key.startswith(pattern) or pattern in key:
+                elif key == pattern or key.startswith(pattern) or pattern in key:
+                    # Skip idle metrics when looking for CPU usage
+                    if pattern == "system.cpu.util" and "idle" in key:
+                        continue
                     result[pattern] = item.get("lastvalue", "N/A")
                     break  # Take first match for each pattern
 

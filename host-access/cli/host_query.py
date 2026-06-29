@@ -35,18 +35,20 @@ def cmd_status(ip: str):
 
         # 2. Zabbix: 取指标
         # 注意：Zabbix item key 格式因主机/版本/OS 而异，使用模糊匹配
+        # 注意：system.cpu.util[] 是 usage，system.cpu.util[,idle] 是 idle，需区分
         item_key_patterns = [
-            "system.cpu.util",           # CPU 使用率 (匹配 system.cpu.util 和 system.cpu.util[])
+            "system.cpu.util[]",           # CPU 使用率（精确匹配无参数）
+            "system.cpu.util",             # CPU 使用率 (备用匹配)
             "vm.memory.size[pavailable]",  # 内存可用率 (Linux)
-            "vm.memory.util",            # 内存使用率 (Windows)
-            "vfs.fs.size[/,pused]",      # 磁盘使用率（Linux 根分区）
+            "vm.memory.util",              # 内存使用率 (Windows)
+            "vfs.fs.size[/,pused]",        # 磁盘使用率（Linux 根分区）
             "vfs.fs.dependent.size[/,pused]",  # 磁盘使用率（Linux 新格式）
-            "vfs.fs.size[/,pfree]",      # 磁盘可用率（Linux 备用）
-            "vfs.fs.size[C:,pused]",     # 磁盘使用率（Windows C 盘）
-            "vfs.fs.size[D:,pused]",     # 磁盘使用率（Windows D 盘）
-            "system.cpu.load[all,avg1]", # load1 (Linux all)
+            "vfs.fs.size[/,pfree]",        # 磁盘可用率（Linux 备用）
+            "vfs.fs.size[C:,pused]",       # 磁盘使用率（Windows C 盘）
+            "vfs.fs.size[D:,pused]",       # 磁盘使用率（Windows D 盘）
+            "system.cpu.load[all,avg1]",   # load1 (Linux all)
             "system.cpu.load[percpu,avg1]", # load1 (Linux percpu)
-            "agent.ping",                # 在线状态
+            "agent.ping",                  # 在线状态
         ]
 
         # 网卡自动发现（暂不显示网络流量）
@@ -62,7 +64,9 @@ def cmd_status(ip: str):
 
         # 4. 格式化输出
         online = "online" if host.get("available") == "1" else "offline"
-        cpu = metrics.get("system.cpu.util", "N/A")
+        # CPU：优先使用精确匹配 system.cpu.util[]，备用 system.cpu.util
+        cpu = metrics.get("system.cpu.util[]",
+                metrics.get("system.cpu.util", "N/A"))
         # 内存：Linux 用 pavailable，Windows 用 memory.util
         mem = metrics.get("vm.memory.size[pavailable]",
                 metrics.get("vm.memory.util", "N/A"))
