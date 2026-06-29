@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" font-family="-apple-system, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="arrow-o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+    <marker id="arrow-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity="0.18"/></filter>
+  </defs>
+  <rect width="1200" height="760" fill="#fbfbfd"/>
+  <text x="600" y="38" font-size="22" font-weight="700" text-anchor="middle" fill="#0f172a">AIOps 一期：Linux 接入架构（spec §3.1 现状还原）</text>
+  <text x="600" y="60" font-size="13" text-anchor="middle" fill="#64748b">OpenClaw 多 Agent 平台 · rag 纯知识库 · host-access 独立取数 · linux agent 编排</text>
+  <rect x="30" y="80" width="1140" height="560" rx="14" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8,5"/>
+  <text x="50" y="104" font-size="13" font-weight="600" fill="#64748b">OpenClaw 多 Agent 平台</text>
+  <circle cx="600" cy="148" r="20" fill="#0f172a"/>
+  <text x="600" y="130" font-size="12" text-anchor="middle" fill="#334155">用户自然语言</text>
+  <path d="M600,168 L600,184 M588,176 L600,184 L612,176" stroke="#0f172a" stroke-width="2" fill="none"/>
+  <rect x="510" y="190" width="180" height="56" rx="8" fill="#1e293b" filter="url(#sh)"/>
+  <text x="600" y="214" font-size="14" font-weight="700" text-anchor="middle" fill="#f8fafc">main (协调)</text>
+  <text x="600" y="232" font-size="11" text-anchor="middle" fill="#cbd5e1">主机状态/负载类 → linux agent</text>
+  <line x1="600" y1="170" x2="600" y2="190" stroke="#2563eb" stroke-width="2"/>
+  <line x1="690" y1="218" x2="760" y2="218" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-o)"/>
+  <text x="725" y="210" font-size="10" text-anchor="middle" fill="#ea580c">分发</text>
+  <rect x="760" y="190" width="240" height="56" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="880" y="210" font-size="12" font-weight="700" text-anchor="middle" fill="#92400e">🆕 linux agent</text>
+  <text x="880" y="228" font-size="10" text-anchor="middle" fill="#92400e">workspace-linux · host-status skill 编排</text>
+  <rect x="180" y="330" width="880" height="90" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="200" y="352" font-size="12" font-weight="600" fill="#475569">CLI 层（硬规则：单次调用，禁脚本串联）</text>
+  <rect x="210" y="362" width="240" height="46" rx="6" fill="#fff" stroke="#059669" stroke-width="1.5"/>
+  <text x="330" y="382" font-size="12" font-weight="700" text-anchor="middle" fill="#065f46">host-query CLI</text>
+  <text x="330" y="398" font-size="10" text-anchor="middle" fill="#059669">status / items</text>
+  <rect x="500" y="362" width="240" height="46" rx="6" fill="#fff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="620" y="382" font-size="12" font-weight="700" text-anchor="middle" fill="#1e40af">aiops-query CLI</text>
+  <text x="620" y="398" font-size="10" text-anchor="middle" fill="#2563eb">impact / topology</text>
+  <rect x="790" y="362" width="240" height="46" rx="6" fill="#fff" stroke="#94a3b8" stroke-dasharray="4,3"/>
+  <text x="910" y="382" font-size="12" font-weight="600" text-anchor="middle" fill="#64748b">(他 agent)</text>
+  <line x1="810" y1="246" x2="330" y2="362" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="4,2" marker-end="url(#arrow-gray)"/>
+  <line x1="880" y1="246" x2="620" y2="362" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="4,2" marker-end="url(#arrow-gray)"/>
+  <rect x="110" y="470" width="360" height="150" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="290" y="494" font-size="14" font-weight="700" text-anchor="middle" fill="#065f46">🆕 host-access（独立服务）</text>
+  <rect x="130" y="506" width="150" height="34" rx="5" fill="#fff" stroke="#10b981"/>
+  <text x="205" y="527" font-size="11" text-anchor="middle" fill="#065f46">zabbix/client.py</text>
+  <rect x="300" y="506" width="150" height="34" rx="5" fill="#fff" stroke="#10b981"/>
+  <text x="375" y="527" font-size="11" text-anchor="middle" fill="#065f46">relation/host_resolver</text>
+  <rect x="130" y="556" width="320" height="48" rx="5" fill="#065f46"/>
+  <text x="290" y="576" font-size="11" font-weight="600" text-anchor="middle" fill="#ecfdf5">Zabbix client + IP↔host_id 关联</text>
+  <text x="290" y="592" font-size="10" text-anchor="middle" fill="#a7f3d0">调 rag HTTP 取 host_id · 不落库</text>
+  <rect x="530" y="470" width="320" height="150" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="690" y="494" font-size="14" font-weight="700" text-anchor="middle" fill="#1e40af">rag（知识库，纯静态）</text>
+  <rect x="550" y="506" width="280" height="34" rx="5" fill="#fff" stroke="#3b82f6"/>
+  <text x="690" y="527" font-size="11" text-anchor="middle" fill="#1e40af">FastAPI:8001 · 文档检索+拓扑</text>
+  <rect x="550" y="556" width="280" height="48" rx="5" fill="#1e3a8a"/>
+  <text x="690" y="576" font-size="11" font-weight="600" text-anchor="middle" fill="#dbeafe">🆕 GET /api/v1/host/resolve?ip=</text>
+  <text x="690" y="592" font-size="10" text-anchor="middle" fill="#bfdbfe">一期唯一改动 · 按 IP→host_id</text>
+  <rect x="900" y="470" width="240" height="150" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+  <text x="1020" y="494" font-size="13" font-weight="700" text-anchor="middle" fill="#334155">ES + Neo4j</text>
+  <text x="1020" y="516" font-size="11" text-anchor="middle" fill="#64748b">静态拓扑 / 文档</text>
+  <text x="1020" y="540" font-size="10" text-anchor="middle" fill="#64748b">host.ip 唯一约束 ✓</text>
+  <text x="1020" y="558" font-size="10" text-anchor="middle" fill="#64748b">28 host 全有 IP ✓</text>
+  <text x="1020" y="576" font-size="10" text-anchor="middle" fill="#dc2626">cluster: 0 数据 ⚠</text>
+  <line x1="330" y1="408" x2="290" y2="470" stroke="#059669" stroke-width="2" marker-end="url(#arrow-g)"/>
+  <text x="345" y="438" font-size="10" fill="#059669">调用</text>
+  <line x1="620" y1="408" x2="690" y2="470" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="635" y="438" font-size="10" fill="#2563eb">调用</text>
+  <line x1="690" y1="540" x2="900" y2="540" stroke="#2563eb" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="795" y="533" font-size="10" text-anchor="middle" fill="#2563eb">Cypher/ES</text>
+  <line x1="470" y1="530" x2="530" y2="530" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-o)"/>
+  <rect x="475" y="516" width="50" height="16" rx="3" fill="#fbfbfd" opacity="0.95"/>
+  <text x="500" y="528" font-size="9" text-anchor="middle" fill="#ea580c">resolve</text>
+  <rect x="110" y="670" width="360" height="56" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="290" y="694" font-size="13" font-weight="700" text-anchor="middle" fill="#991b1b">Zabbix API（外部，JSON-RPC）</text>
+  <text x="290" y="712" font-size="10" text-anchor="middle" fill="#dc2626">只读 host.get / item.get / history.get</text>
+  <line x1="290" y1="620" x2="290" y2="670" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="900" y="670" width="240" height="56" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <line x1="916" y1="688" x2="940" y2="688" stroke="#2563eb" stroke-width="2"/>
+  <text x="946" y="691" font-size="10" fill="#334155">数据/调用</text>
+  <line x1="916" y1="704" x2="940" y2="704" stroke="#ea580c" stroke-width="2"/>
+  <text x="946" y="707" font-size="10" fill="#334155">关联调用(IP→host_id)</text>
+  <line x1="1050" y1="688" x2="1074" y2="688" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="4,2"/>
+  <text x="1080" y="691" font-size="10" fill="#334155">agent→CLI</text>
+  <line x1="1050" y1="704" x2="1074" y2="704" stroke="#dc2626" stroke-width="2"/>
+  <text x="1080" y="707" font-size="10" fill="#334155">外部监控</text>
+</svg>

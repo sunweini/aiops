@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1000" font-family="-apple-system, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="arr-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity="0.18"/></filter>
+  </defs>
+  <rect width="1400" height="1000" fill="#fbfbfd"/>
+  <text x="700" y="38" font-size="22" font-weight="700" text-anchor="middle" fill="#0f172a">组件边界对照：spec 设计 vs 实际代码（🔴 缺口标注）</text>
+  <text x="700" y="62" font-size="12" text-anchor="middle" fill="#64748b">绿色=spec 描述 · 红色=对照代码发现的缺口/偏差 · 蓝色=已确认无问题</text>
+  <rect x="40" y="90" width="520" height="420" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="300" y="114" font-size="15" font-weight="700" text-anchor="middle" fill="#1e40af">rag（知识库）</text>
+  <text x="300" y="134" font-size="11" text-anchor="middle" fill="#2563eb">职责：文档检索 + 拓扑查询（不变）</text>
+  <rect x="60" y="150" width="230" height="40" rx="5" fill="#fff" stroke="#3b82f6"/>
+  <text x="175" y="174" font-size="11" text-anchor="middle" fill="#1e40af">FastAPI:8001</text>
+  <rect x="310" y="150" width="230" height="40" rx="5" fill="#fff" stroke="#3b82f6"/>
+  <text x="425" y="174" font-size="11" text-anchor="middle" fill="#1e40af">aiops-query CLI</text>
+  <rect x="60" y="206" width="480" height="30" rx="4" fill="#f0f9ff"/>
+  <text x="300" y="226" font-size="10" text-anchor="middle" fill="#1e40af">端点: /query · /topology · /impact · /graph/* · /cluster/* · /health*</text>
+  <rect x="60" y="250" width="480" height="40" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="74" y="268" font-size="10" font-weight="700" fill="#dc2626">🔴 Issue #1: CLI 路径断裂</text>
+  <text x="74" y="282" font-size="9" fill="#991b1b">aiops-query 硬编码 ~/.openclaw/workspace-shared/rag · rag-wiki → 下沉后失效</text>
+  <rect x="60" y="300" width="480" height="40" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="74" y="318" font-size="10" font-weight="700" fill="#dc2626">🔴 Issue #2: rag-wiki 位置混乱</text>
+  <text x="74" y="332" font-size="9" fill="#991b1b">CLI 用 ~/.openclaw/workspace-shared/rag-wiki · 实际 wiki 在 rag/wiki/ · 关系不明</text>
+  <rect x="60" y="350" width="480" height="40" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="74" y="368" font-size="10" font-weight="700" fill="#dc2626">🔴 Issue #3: cluster 数据为 0</text>
+  <text x="74" y="382" font-size="9" fill="#991b1b">topology clusters:0 · get_host_cluster 存在但空跑 · spec 未提及</text>
+  <rect x="60" y="400" width="480" height="36" rx="5" fill="#ecfdf5" stroke="#059669"/>
+  <text x="74" y="418" font-size="10" font-weight="700" fill="#065f46">✅ 新增端点: GET /api/v1/host/resolve?ip=</text>
+  <text x="74" y="430" font-size="9" fill="#059669">spec 说"一期唯一改动" → 实际确认确实只需 1 函数+1 端点 · 28 host 全有 IP</text>
+  <rect x="60" y="446" width="480" height="44" rx="5" fill="#f8fafc" stroke="#94a3b8"/>
+  <text x="300" y="466" font-size="10" text-anchor="middle" fill="#475569">Host 节点: ip 字段 + host_ip 唯一约束 ✓</text>
+  <text x="300" y="482" font-size="10" text-anchor="middle" fill="#475569">现有 /impact?host_id= 多跳分析已完备 ✓</text>
+  <rect x="40" y="540" width="520" height="380" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+  <text x="300" y="564" font-size="15" font-weight="700" text-anchor="middle" fill="#065f46">🆕 host-access（独立取数服务）</text>
+  <text x="300" y="584" font-size="11" text-anchor="middle" fill="#059669">职责：Zabbix API 调用 + IP↔host_id 关联 + CLI 暴露</text>
+  <rect x="60" y="600" width="230" height="40" rx="5" fill="#fff" stroke="#10b981"/>
+  <text x="175" y="624" font-size="11" text-anchor="middle" fill="#065f46">zabbix/client.py</text>
+  <rect x="310" y="600" width="230" height="40" rx="5" fill="#fff" stroke="#ea580c"/>
+  <text x="425" y="624" font-size="11" text-anchor="middle" fill="#92400e">relation/host_resolver.py</text>
+  <rect x="60" y="656" width="480" height="44" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="74" y="674" font-size="10" font-weight="700" fill="#dc2626">🔴 Issue #4: 指标键硬编码</text>
+  <text x="74" y="690" font-size="9" fill="#991b1b">net.if.in[eth0] 假设 eth0（实际可能 bond0/ens33）· vfs.fs.size[/,pused] 只根分区</text>
+  <rect x="60" y="710" width="480" height="44" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="74" y="728" font-size="10" font-weight="700" fill="#dc2626">🔴 Issue #5: Zabbix name ≠ rag host_id</text>
+  <text x="74" y="744" font-size="9" fill="#991b1b">Zabbix "master-1" vs rag "host_es_master_01" · §5.3 输出易混淆</text>
+  <rect x="60" y="764" width="480" height="36" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="74" y="782" font-size="10" font-weight="700" fill="#dc2626">🔴 Issue #6: Token 无缓存</text>
+  <text x="74" y="794" font-size="9" fill="#991b1b">每次 CLI login→调用→logout · 加延迟 · §6 说 re-login 但未提缓存</text>
+  <rect x="60" y="810" width="480" height="36" rx="5" fill="#ecfdf5" stroke="#059669"/>
+  <text x="300" y="830" font-size="10" text-anchor="middle" fill="#065f46">✅ host-query CLI 范式同 aiops-query · 单次调用 · 禁脚本串联 ✓</text>
+  <rect x="60" y="856" width="480" height="36" rx="5" fill="#ecfdf5" stroke="#059669"/>
+  <text x="300" y="876" font-size="10" text-anchor="middle" fill="#065f46">✅ config.py pydantic-settings + .env 模式一致 ✓</text>
+  <rect x="600" y="90" width="380" height="320" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="790" y="114" font-size="15" font-weight="700" text-anchor="middle" fill="#92400e">🆕 linux agent</text>
+  <text x="790" y="134" font-size="11" text-anchor="middle" fill="#92400e">职责：编排 host-query + aiops-query → 融合回答</text>
+  <rect x="620" y="150" width="340" height="48" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="634" y="170" font-size="10" font-weight="700" fill="#dc2626">🔴 Issue #7: routing 冲突</text>
+  <text x="634" y="186" font-size="9" fill="#991b1b">rag SKILL 已有 "xx挂了"→impact · linux agent 也处理主机查询</text>
+  <text x="634" y="196" font-size="9" fill="#991b1b">边界未明确：用 IP 问走 linux？用 host_id 问走 rag？</text>
+  <rect x="620" y="210" width="340" height="40" rx="5" fill="#fff" stroke="#f59e0b"/>
+  <text x="790" y="230" font-size="11" text-anchor="middle" fill="#92400e">host-status skill（编排）</text>
+  <text x="790" y="244" font-size="10" text-anchor="middle" fill="#92400e">提取 IP → host-query → impact → 融合</text>
+  <rect x="620" y="264" width="340" height="40" rx="5" fill="#fff" stroke="#f59e0b"/>
+  <text x="790" y="284" font-size="11" text-anchor="middle" fill="#92400e">workspace-linux 新建</text>
+  <text x="790" y="298" font-size="10" text-anchor="middle" fill="#92400e">openclaw.json 注册 + 路由</text>
+  <rect x="620" y="316" width="340" height="36" rx="5" fill="#ecfdf5" stroke="#059669"/>
+  <text x="790" y="336" font-size="10" text-anchor="middle" fill="#065f46">✅ 串行编排逻辑正确 ✓</text>
+  <text x="790" y="348" font-size="9" text-anchor="middle" fill="#059669">host_id 是关键传递变量 · 必须先 host-query 再 impact</text>
+  <rect x="600" y="440" width="380" height="200" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="790" y="464" font-size="14" font-weight="700" text-anchor="middle" fill="#334155">OpenClaw 配置</text>
+  <rect x="620" y="480" width="340" height="40" rx="5" fill="#fff" stroke="#94a3b8"/>
+  <text x="790" y="504" font-size="11" text-anchor="middle" fill="#334155">openclaw.json 新增 linux agent</text>
+  <rect x="620" y="530" width="340" height="40" rx="5" fill="#fff" stroke="#94a3b8"/>
+  <text x="790" y="554" font-size="11" text-anchor="middle" fill="#334155">main 路由规则新增</text>
+  <rect x="1020" y="90" width="340" height="870" rx="10" fill="#fff" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="1190" y="114" font-size="14" font-weight="700" text-anchor="middle" fill="#0f172a">评审发现汇总</text>
+  <text x="1190" y="136" font-size="11" text-anchor="middle" fill="#64748b">7 个问题 · 2 个确认无问题</text>
+  <rect x="1036" y="160" width="308" height="68" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.2"/>
+  <text x="1050" y="176" font-size="11" font-weight="700" fill="#dc2626">🔴 Issue #1: CLI 路径断裂 [高危]</text>
+  <text x="1050" y="192" font-size="9" fill="#334155">rag 下沉后 aiops-query 路径检测失效</text>
+  <text x="1050" y="208" font-size="9" fill="#059669">→ 需更新 CLI _cand 列表</text>
+  <rect x="1036" y="238" width="308" height="68" rx="5" fill="#fef2f2" stroke="#ea580c" stroke-width="1.2"/>
+  <text x="1050" y="254" font-size="11" font-weight="700" fill="#ea580c">🔴 Issue #2: rag-wiki 位置混乱 [中危]</text>
+  <text x="1050" y="270" font-size="9" fill="#334155">CLI 用 rag-wiki/ 但实际在 rag/wiki/</text>
+  <text x="1050" y="286" font-size="9" fill="#059669">→ 需统一或澄清</text>
+  <rect x="1036" y="316" width="308" height="68" rx="5" fill="#fef2f2" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="1050" y="332" font-size="11" font-weight="700" fill="#f59e0b">🔴 Issue #3: cluster 数据为空 [低危]</text>
+  <text x="1050" y="348" font-size="9" fill="#334155">topology clusters:0 · get_host_cluster 空跑</text>
+  <text x="1050" y="364" font-size="9" fill="#059669">→ spec 应标注已知限制</text>
+  <rect x="1036" y="394" width="308" height="68" rx="5" fill="#fef2f2" stroke="#ea580c" stroke-width="1.2"/>
+  <text x="1050" y="410" font-size="11" font-weight="700" fill="#ea580c">🔴 Issue #4: 指标键硬编码 [中危]</text>
+  <text x="1050" y="426" font-size="9" fill="#334155">eth0/根分区假设 · 多网卡多挂载不覆盖</text>
+  <text x="1050" y="442" font-size="9" fill="#059669">→ 需 iface 发现 + 多 fs 配置</text>
+  <rect x="1036" y="472" width="308" height="68" rx="5" fill="#fef2f2" stroke="#ea580c" stroke-width="1.2"/>
+  <text x="1050" y="488" font-size="11" font-weight="700" fill="#ea580c">🔴 Issue #5: Zabbix name vs host_id [中危]</text>
+  <text x="1050" y="504" font-size="9" fill="#334155">两者不同 · §5.3 输出格式易混淆</text>
+  <text x="1050" y="520" font-size="9" fill="#059669">→ 需明确标注来源</text>
+  <rect x="1036" y="550" width="308" height="68" rx="5" fill="#fef2f2" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="1050" y="566" font-size="11" font-weight="700" fill="#f59e0b">🔴 Issue #6: Token 无缓存 [低危]</text>
+  <text x="1050" y="582" font-size="9" fill="#334155">每次 login/logout · 加延迟</text>
+  <text x="1050" y="598" font-size="9" fill="#059669">→ 可加 TTL 缓存优化</text>
+  <rect x="1036" y="628" width="308" height="68" rx="5" fill="#fef2f2" stroke="#dc2626" stroke-width="1.2"/>
+  <text x="1050" y="644" font-size="11" font-weight="700" fill="#dc2626">🔴 Issue #7: routing 冲突 [高危]</text>
+  <text x="1050" y="660" font-size="9" fill="#334155">rag 与 linux agent 路由边界未明确</text>
+  <text x="1050" y="676" font-size="9" fill="#059669">→ 需明确 IP/host_id 分流规则</text>
+</svg>
