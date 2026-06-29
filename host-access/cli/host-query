@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Executable wrapper for host-query CLI."""
-import os, sys
+"""host-query CLI — 主机实时状态查询（系统全局安装）。"""
 
-# Ensure the cli package directory is on the path so the module is importable
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
+import os
+
+# 添加 host-access 目录到 Python 路径
+HOST_ACCESS_DIR = "/root/.openclaw/workspace-shared/aiops/host-access"
+sys.path.insert(0, HOST_ACCESS_DIR)
+os.chdir(HOST_ACCESS_DIR)
 
 from cli.host_query import cmd_status, cmd_items
 
