@@ -1,8 +1,9 @@
 # AIOps 一期：Linux 接入设计
 
 **日期**: 2026-06-29
-**状态**: 设计稿（待评审）
+**状态**: 设计稿（评审修复中）
 **作者**: brainstorming 会话产出
+**评审**: 2026-06-29 可视化评审，修复 7 个问题（2 高危 + 3 中危 + 2 低危）
 
 ---
 
@@ -17,6 +18,8 @@ AIOps 知识库 RAG（`rag/`）已上线，提供：
 - 现有接入方式：`aiops-query` CLI + OpenClaw skill（硬规则：单次 CLI 调用，禁止脚本串联）
 
 拓扑中 Host 节点已有 `ip` 字段、`host_ip` 唯一约束，及 `get_host_services` / `get_host_impact` 等按 host_id 查询能力。但 `wiki/hosts/` 主机文档目录为空。
+
+**已知限制（🟡 评审标注）**：topology 中 `clusters: 0`，cluster 数据尚未录入。`get_host_cluster` / `get_service_cluster` 函数存在但当前空跑。一期不依赖 cluster 扩展能力，后续补充 cluster 数据后可启用。
 
 RAG 是**纯静态知识库**：查文档、查拓扑。无任何实时主机状态能力。
 
@@ -182,7 +185,49 @@ workspace-shared/aiops/                    ← AIOps 项目根（新建）
 - `app/api/routes.py`：`/app/wiki/...`、`/app/scripts/...` — 容器内，不变
 - `docker-compose.yml`：`./wiki:/app/wiki`、`build: context: .` — 跟随 rag 下沉，相对路径仍正确
 
-**结论**：rag 下沉仅移动目录位置，容器内路径零改动，宿主侧 docker-compose 仍相对自身目录，无需改路径。
+**CLI 路径适配（🔴 评审修复）**：
+
+`aiops-query` CLI 的路径检测逻辑需更新，支持新旧两路：
+
+```python
+# skills/aiops-query 的 _cand 列表需追加新路径
+for _cand in [
+    os.path.expanduser("~/.openclaw/workspace-shared/aiops/rag"),  # 新路径
+    os.path.expanduser("~/.openclaw/workspace-shared/rag"),        # 旧路径（兼容）
+    "/root/.openclaw/workspace-shared/aiops/rag",
+    "/root/.openclaw/workspace-shared/rag"
+]:
+```
+
+**rag-wiki 位置澄清（🔴 评审修复）**：
+
+当前 `~/.openclaw/workspace-shared/rag-wiki/` 是**遗留空目录**（仅 `hosts/` 子目录存在但为空）。实际 wiki 内容在 `rag/wiki/`。CLI 的 `WIKI_DIR` 应统一指向 `rag/wiki/`，废弃 `rag-wiki/` 目录。
+
+**Skill 文件路径修复（🔴 评审修复）**：
+
+rag 下沉后，`skills/SKILL.md` 和 `skills/aiops-query` 中的路径引用需同步更新：
+
+| 文件 | 原路径 | 新路径 |
+|------|--------|--------|
+| `skills/SKILL.md` L25 | `~/.openclaw/skills/aiops-rag/aiops-query` | `~/.openclaw/workspace-shared/aiops/rag/skills/aiops-query` |
+| `skills/SKILL.md` L109 | `~/.openclaw/skills/aiops-rag/templates/sop.md` | `~/.openclaw/workspace-shared/aiops/rag/skills/templates/sop.md` |
+| `skills/SKILL.md` L116 | `~/.openclaw/skills/aiops-rag/templates/tech.md` | `~/.openclaw/workspace-shared/aiops/rag/skills/templates/tech.md` |
+| `skills/SKILL.md` L123 | `~/.openclaw/skills/aiops-rag/templates/incident.md` | `~/.openclaw/workspace-shared/aiops/rag/skills/templates/incident.md` |
+| `skills/aiops-query` L63-64 | `~/.openclaw/workspace-shared/rag` | 加 `aiops/rag` 到 `_cand` 列表 |
+| `skills/aiops-query` L72 | `~/.openclaw/workspace-shared/rag-wiki` | `~/.openclaw/workspace-shared/aiops/rag/wiki` |
+
+**OpenClaw skill 安装位置**：
+
+当前 skill 安装在 `~/.openclaw/skills/aiops-rag/`（符号链接或复制）。rag 下沉后有两种选择：
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| A) 保持 skill 在 `~/.openclaw/skills/aiops-rag/` | 零改动，OpenClaw 自动加载 | skill 与 rag 代码分离，版本可能不同步 |
+| B) skill 跟随 rag 到 `aiops/rag/skills/` | 代码+skill 一体 | 需更新 OpenClaw 配置指向新路径 |
+
+**推荐方案 A**：skill 保持在 `~/.openclaw/skills/aiops-rag/`，但 `SKILL.md` 内的路径引用改为绝对路径（指向 `aiops/rag/`）。这样 OpenClaw 加载逻辑不变，只需更新 `SKILL.md` 文本。
+
+**结论**：rag 下沉仅移动目录位置，容器内路径零改动，宿主侧 docker-compose 仍相对自身目录，无需改路径。但 CLI 路径检测需适配新位置，rag-wiki 遗留目录需清理，skill 文件路径引用需同步更新。
 
 ### 4.2 host-access 配置
 
@@ -221,6 +266,47 @@ net.if.out[eth0]             # 网络出流量
 agent.ping                   # 在线状态
 ```
 
+**指标键配置优化（🟠 评审修复）**：
+
+上述指标键中 `net.if.in[eth0]` / `net.if.out[eth0]` 假设网卡名为 `eth0`，实际生产主机可能使用 `bond0`、`ens33`、`enp0s3` 等。一期实现需支持**网卡自动发现**：
+
+```python
+# zabbix/client.py 新增方法
+def discover_network_interfaces(self, hostid: str) -> list[str]:
+    """返回该主机所有网络接口名，如 ['eth0', 'bond0']"""
+    items = self.get_host_items(hostid)
+    ifaces = []
+    for item in items:
+        if item['key_'].startswith('net.if.in[') or item['key_'].startswith('net.if.out['):
+            iface = item['key_'].split('[')[1].rstrip(']')
+            if iface not in ifaces:
+                ifaces.append(iface)
+    return ifaces
+```
+
+`status` 命令优先取 `eth0`，若不存在则取列表第一个。磁盘同理可扩展多挂载点（`/data`、`/var`），但一期仅根分区。
+
+**Token 缓存优化（🟡 评审修复）**：
+
+当前设计每次 CLI 调用都 `user.login` → 调用 → `user.logout`，增加延迟。建议 `client.py` 实现简单 TTL 缓存：
+
+```python
+class ZabbixClient:
+    def __init__(self, url, user, password, token_ttl=900):
+        self._token = None
+        self._token_exp = 0
+        self.token_ttl = token_ttl  # 15 分钟
+
+    def _get_token(self):
+        if time.time() < self._token_exp:
+            return self._token
+        self._token = self.login()
+        self._token_exp = time.time() + self.token_ttl
+        return self._token
+```
+
+CLI 进程退出时调用 `logout` 清理。同进程内多次调用复用 token。
+
 ### 5.2 IP↔host_id 关联（`host-access/relation/host_resolver.py`）
 
 - host-access 持 rag 的 HTTP 地址
@@ -244,14 +330,23 @@ agent.ping                   # 在线状态
 `status` 输出（结构化文本，agent 易读）：
 
 ```
-Host: host_es_master_01 (10.33.17.100)
-Zabbix: online
+Host: host_es_master_01 (10.33.17.100)           ← rag host_id (IP)
+Zabbix: online                                   ← Zabbix agent.ping
+Zabbix name: master-1                            ← Zabbix host.name（参考）
 CPU: 12.3%    Memory avail: 45.2%
 Disk /: 67.8% used
 Load1: 1.24
 Net eth0 in: 1.2MB/s out: 800KB/s
 host_id: host_es_master_01   ← 用于后续调 aiops-query
 ```
+
+** 评审修复：Zabbix name vs rag host_id 标注**：
+
+Zabbix 返回的 `name`（如 "master-1"）与 rag `host_id`（如 "host_es_master_01"）**不同**。两者通过 IP 关联，但语义不同：
+- `host_id` = rag 拓扑主键，用于 `aiops-query impact <host_id>`
+- `zabbix_name` = Zabbix 侧主机名，仅供运维参考
+
+输出格式已拆分两行标注来源，避免混淆。`host_id` 行保留用于下游 CLI 调用。
 
 ### 5.4 linux agent + skill
 
@@ -275,6 +370,32 @@ skill 硬规则（同 rag skill）：单次 CLI 调用，禁止脚本串联。
 
 - agents 段加 `linux` agent，绑定 workspace-linux
 - main 的路由规则加：主机状态/负载类查询 → linux agent
+
+**路由分流规则（🔴 评审修复：解决 rag vs linux agent 冲突）**：
+
+rag SKILL.md 已有路由规则 `"xx挂了" → impact <host_id>`，linux agent 也处理主机查询。需明确边界：
+
+| 用户提问模式 | 路由目标 | 理由 |
+|-------------|---------|------|
+| 含 IP 地址（`10.33.17.100 负载多少`） | **linux agent** | 需实时指标，rag 无此能力 |
+| 含 host_id（`host_es_master_01 影响什么`） | **rag skill** | 纯拓扑查询，rag 已完备 |
+| 含主机名但无 IP（`master-1 怎么了`） | **linux agent** | 需先 Zabbix 解析 IP，rag 无主机名索引 |
+| 文档/SOP 相关（`nginx 502 排查`） | **rag skill** | 纯知识库，不涉及实时状态 |
+| 混合查询（`10.33.17.100 负载 + 影响`） | **linux agent** | 需融合实时 + 拓扑，linux agent 编排 |
+
+**main 路由规则伪代码**：
+```
+if query contains IP address:
+    route to linux agent
+elif query contains host_id pattern (host_*):
+    route to rag skill (impact/topology)
+elif query is about docs/SOP/incident:
+    route to rag skill (query)
+else:
+    route to rag skill (default)
+```
+
+**rag SKILL.md 需同步更新**：在路由决策表加一条"主机实时状态/含 IP 查询 → 转 linux agent"，避免 rag 尝试回答无实时数据的问题。
 
 ---
 
@@ -330,7 +451,21 @@ skill 硬规则（同 rag skill）：单次 CLI 调用，禁止脚本串联。
 
 ---
 
-## 附录：会话决策溯源
+## 附录 A：评审修订记录
+
+| 编号 | 严重度 | 问题 | 修复位置 | 修复内容 |
+|------|--------|------|---------|---------|
+| #1 | 🔴 高危 | CLI 路径断裂 | §4.1 | 新增 CLI 路径适配段，`_cand` 列表支持新旧两路 |
+| #2 |  中危 | rag-wiki 位置混乱 | §4.1 | 澄清 rag-wiki 为遗留空目录，应统一指向 `rag/wiki/` |
+| #3 | 🟡 低危 | cluster 数据为空 | §1.1 | 新增"已知限制"标注，一期不依赖 cluster 能力 |
+| #4 | 🟠 中危 | 指标键硬编码 | §5.1 | 新增网卡自动发现方法 + token TTL 缓存优化 |
+| #5 |  中危 | Zabbix name vs host_id 混淆 | §5.3 | 输出格式拆分两行，明确标注来源 |
+| #6 | 🟡 低危 | Token 无缓存 | §5.1 | 新增 token TTL 缓存方案（同进程复用） |
+| #7 |  高危 | routing 冲突 | §5.5 | 新增路由分流规则表 + main 路由伪代码 + rag SKILL.md 同步更新 |
+
+---
+
+## 附录 B：会话决策溯源
 
 本设计由 brainstorming 会话逐题锁定，决策点见第 2 节。关键转折：
 
