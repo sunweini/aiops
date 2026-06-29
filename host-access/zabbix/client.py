@@ -117,47 +117,40 @@ class ZabbixClient:
             },
         )
 
-    def get_latest_metrics(self, hostid: str, item_keys: list[str]) -> dict:
-        """Return latest values for the given item keys."""
+    def get_latest_metrics(self, hostid: str, item_key_patterns: list[str]) -> dict:
+        """Return latest values for items matching the given key patterns.
+
+        Uses ``lastvalue`` from ``item.get`` (no separate history.get needed).
+        Supports both exact match and prefix match.
+        """
         items = self.get_host_items(hostid)
-        key_to_itemid = {
-            item["key_"]: item["itemid"]
-            for item in items
-            if item["key_"] in item_keys
-        }
-        if not key_to_itemid:
-            return {}
 
-        history = self._rpc_call(
-            "history.get",
-            {
-                "itemids": list(key_to_itemid.values()),
-                "output": "extend",
-                "limit": 1,
-                "sortfield": "clock",
-                "sortorder": "DESC",
-            },
-        )
+        result: dict[str, str] = {}
+        for pattern in item_key_patterns:
+            for item in items:
+                key = item["key_"]
+                # Exact match or prefix match
+                if key == pattern or key.startswith(pattern) or pattern in key:
+                    result[pattern] = item.get("lastvalue", "N/A")
+                    break  # Take first match for each pattern
 
-        itemid_to_key = {iid: key for key, iid in key_to_itemid.items()}
-        result = {}
-        for h in history:
-            key = itemid_to_key.get(h["itemid"])
-            if key:
-                result[key] = h.get("value", "N/A")
         return result
 
     def discover_network_interfaces(self, hostid: str) -> list[str]:
         """Return unique network interface names for a host.
 
         Parses ``net.if.in[<iface>]`` / ``net.if.out[<iface>]`` item keys.
+        Handles formats: ``eth0``, ``"eth0"``, ``"eth0",dropped``.
         """
         items = self.get_host_items(hostid)
         ifaces: list[str] = []
         for item in items:
             key = item.get("key_", "")
             if key.startswith("net.if.in[") or key.startswith("net.if.out["):
-                iface = key.split("[", 1)[1].rstrip("]")
+                # Extract interface name: net.if.in["eth0",dropped] -> eth0
+                raw = key.split("[", 1)[1].rstrip("]")
+                # Remove quotes and extra params: "eth0",dropped -> eth0
+                iface = raw.split(",")[0].strip('"')
                 if iface and iface not in ifaces:
                     ifaces.append(iface)
         return ifaces
