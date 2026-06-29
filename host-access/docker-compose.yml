@@ -1,0 +1,15 @@
+services:
+  host-access:
+    build: .
+    container_name: host-access
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./.env:/app/.env:ro
+    networks:
+      - aiops-net
+
+networks:
+  aiops-net:
+    external: true
+    name: rag_rag-net
