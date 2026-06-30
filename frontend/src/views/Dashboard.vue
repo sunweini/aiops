@@ -22,7 +22,7 @@
       <div class="panel">
         <div class="panel-header">告警时间线</div>
         <div class="panel-body">
-          <div class="placeholder">告警时间线待实现</div>
+          <AlertTimeline :alerts="mockAlerts" />
         </div>
       </div>
     </div>
@@ -31,6 +31,31 @@
 
 <script setup>
 import KpiCard from '../components/kpi/KpiCard.vue'
+import AlertTimeline from '../components/alerts/AlertTimeline.vue'
+
+const mockAlerts = [
+  {
+    id: 'alert_001',
+    severity: 'critical',
+    title: 'Elasticsearch 集群异常',
+    affectedServices: ['svc_es', 'svc_kibana'],
+    timestamp: '2026-06-30T09:15:00Z'
+  },
+  {
+    id: 'alert_002',
+    severity: 'warning',
+    title: 'Kibana 连接超时',
+    affectedServices: ['svc_kibana'],
+    timestamp: '2026-06-30T09:12:00Z'
+  },
+  {
+    id: 'alert_003',
+    severity: 'warning',
+    title: 'Logstash 数据延迟',
+    affectedServices: ['svc_logstash'],
+    timestamp: '2026-06-30T09:10:00Z'
+  }
+]
 </script>
 
 <style scoped>
