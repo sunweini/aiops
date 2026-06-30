@@ -14,7 +14,12 @@
       <div class="panel">
         <div class="panel-header">服务拓扑图 — 故障传播视图</div>
         <div class="panel-body">
-          <div class="placeholder">拓扑图待实现</div>
+          <TopologyGraph
+            :nodes="mockNodes"
+            :edges="mockEdges"
+            height="350px"
+            @node-click="handleNodeClick"
+          />
         </div>
       </div>
 
@@ -32,6 +37,7 @@
 <script setup>
 import KpiCard from '../components/kpi/KpiCard.vue'
 import AlertTimeline from '../components/alerts/AlertTimeline.vue'
+import TopologyGraph from '../components/topology/TopologyGraph.vue'
 
 const mockAlerts = [
   {
@@ -56,6 +62,31 @@ const mockAlerts = [
     timestamp: '2026-06-30T09:10:00Z'
   }
 ]
+
+const mockNodes = [
+  { id: 'svc_nginx', label: 'Nginx', status: 'healthy' },
+  { id: 'svc_app01', label: 'App01', status: 'healthy' },
+  { id: 'svc_app02', label: 'App02', status: 'healthy' },
+  { id: 'svc_es', label: 'ES', status: 'critical' },
+  { id: 'svc_kibana', label: 'Kibana', status: 'blast' },
+  { id: 'svc_logstash', label: 'Logstash', status: 'blast' },
+  { id: 'svc_db', label: 'SQLServer', status: 'healthy' }
+]
+
+const mockEdges = [
+  { source: 'svc_nginx', target: 'svc_app01' },
+  { source: 'svc_nginx', target: 'svc_app02' },
+  { source: 'svc_app01', target: 'svc_es' },
+  { source: 'svc_app02', target: 'svc_es' },
+  { source: 'svc_kibana', target: 'svc_es' },
+  { source: 'svc_logstash', target: 'svc_es' },
+  { source: 'svc_app01', target: 'svc_db' },
+  { source: 'svc_app02', target: 'svc_db' }
+]
+
+const handleNodeClick = (nodeId) => {
+  console.log('Node clicked:', nodeId)
+}
 </script>
 
 <style scoped>
@@ -95,14 +126,5 @@ const mockAlerts = [
 .panel-body {
   padding: var(--space-md);
   min-height: 300px;
-}
-
-.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-disabled);
-  font-size: var(--font-sm);
 }
 </style>
