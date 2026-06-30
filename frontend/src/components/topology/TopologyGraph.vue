@@ -18,6 +18,10 @@ const props = defineProps({
   height: {
     type: String,
     default: '400px'
+  },
+  layout: {
+    type: String,
+    default: 'cose'
   }
 })
 
@@ -51,7 +55,7 @@ const updateGraph = (nodes, edges) => {
   })
 
   cy.add([...cyNodes, ...cyEdges])
-  cy.layout({ name: 'cose', animate: true }).run()
+  cy.layout({ name: props.layout, animate: true }).run()
   startPulse()
 }
 
@@ -141,6 +145,12 @@ onMounted(() => {
 watch(() => [props.nodes, props.edges], () => {
   updateGraph(props.nodes, props.edges)
 }, { deep: true })
+
+watch(() => props.layout, () => {
+  if (cy) {
+    cy.layout({ name: props.layout, animate: true }).run()
+  }
+})
 
 onUnmounted(() => {
   if (pulseInterval) clearInterval(pulseInterval)
