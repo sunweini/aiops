@@ -159,23 +159,30 @@ async def delete_user(user_id: int):
 
 @router.get("/hosts/status")
 async def hosts_status():
+    """Get all hosts with metrics (optimized: 2 Zabbix API calls total)."""
     import httpx
-    from app.hosts import get_host_metrics
+    from app.hosts import get_all_host_metrics
+
     try:
+        # Get topology from rag-api
         resp = httpx.get(RAG_API_BASE + "/topology/all", timeout=10)
         data = resp.json()
         raw_hosts = data.get("hosts", [])
     except Exception as e:
         return {"hosts": [], "summary": {"total": 0, "online": 0, "offline": 0}, "error": str(e)}
 
+    # Batch query Zabbix (2 API calls: hosts + items)
+    try:
+        all_metrics = get_all_host_metrics()
+    except Exception as e:
+        print(f"Batch metrics failed: {e}")
+        all_metrics = {}
+
     hosts = []
     online = 0
     for h in raw_hosts:
         ip = h.get("ip", "")
-        if ip:
-            info = get_host_metrics(ip)
-        else:
-            info = {"available": False, "metrics": {}}
+        info = all_metrics.get(ip, {"available": False, "metrics": {}})
 
         host_entry = {
             "host_id": h.get("id", ""),

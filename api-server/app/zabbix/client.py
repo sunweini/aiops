@@ -104,6 +104,26 @@ class ZabbixClient:
             "available": host.get("available", "1"),
         }
 
+    def get_all_hosts(self) -> list[dict]:
+        """Return all Zabbix hosts with their interfaces."""
+        result = self._rpc_call(
+            "host.get",
+            {
+                "output": ["hostid", "name", "status", "available"],
+                "selectInterfaces": ["ip"],
+            },
+        )
+        return [
+            {
+                "hostid": h["hostid"],
+                "name": h["name"],
+                "status": h["status"],
+                "available": h.get("available", "1"),
+                "interfaces": h.get("interfaces", []),
+            }
+            for h in result
+        ]
+
     # ---- items / metrics ---------------------------------------------- #
 
     def get_host_items(self, hostid: str) -> list[dict]:
@@ -113,6 +133,16 @@ class ZabbixClient:
             {
                 "hostids": [hostid],
                 "output": ["itemid", "key_", "name", "lastvalue"],
+            },
+        )
+
+    def get_all_items(self) -> list[dict]:
+        """Return all monitoring items for all hosts in one call."""
+        return self._rpc_call(
+            "item.get",
+            {
+                "output": ["itemid", "key_", "name", "lastvalue", "hostid"],
+                "selectHosts": ["hostid"],
             },
         )
 

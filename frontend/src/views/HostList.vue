@@ -17,8 +17,14 @@
       <input class="search" v-model="searchQuery" placeholder="搜索 IP / 主机名...">
     </div>
 
+    <!-- 加载中 -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>加载主机数据中...</p>
+    </div>
+
     <!-- 卡片视图 -->
-    <div v-if="viewMode === 'card'" class="card-grid">
+    <div v-else-if="viewMode === 'card'" class="card-grid">
       <div v-for="h in filteredHosts" :key="h.host_id" class="host-card" @click="$router.push(`/hosts/${h.host_id}`)">
         <div class="card-header">
           <StatusBadge :status="h.available ? 'healthy' : 'critical'" />
@@ -77,7 +83,7 @@
       </table>
     </div>
 
-    <div v-if="!filteredHosts.length" class="empty-state">
+    <div v-if="!loading && !filteredHosts.length" class="empty-state">
       <p>没有匹配的主机</p>
     </div>
   </div>
@@ -92,6 +98,7 @@ const activeFilter = ref('all')
 const searchQuery = ref('')
 const sortBy = ref('name')
 const hosts = ref([])
+const loading = ref(true)
 
 const filters = [
   { key: 'all', label: '全部' },
@@ -101,11 +108,14 @@ const filters = [
 
 onMounted(async () => {
   try {
+    loading.value = true
     const res = await fetch('/api/v1/hosts/status')
     const data = await res.json()
     hosts.value = data.hosts || []
   } catch (e) {
     console.error('Failed to load hosts:', e)
+  } finally {
+    loading.value = false
   }
 })
 
@@ -227,5 +237,23 @@ function formatMetric(v) { return v != null ? v + '%' : 'N/A' }
 .empty-state {
   text-align: center; padding: var(--space-2xl);
   color: var(--text-secondary);
+}
+
+.loading-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: var(--space-3xl); color: var(--text-secondary);
+}
+
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--info);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--space-md);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>
