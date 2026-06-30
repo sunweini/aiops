@@ -14,6 +14,21 @@ const routes = [
     path: '/workspace',
     name: 'Workspace',
     component: () => import('../views/Workspace.vue')
+  },
+  {
+    path: '/hosts',
+    name: 'HostList',
+    component: () => import('../views/HostList.vue')
+  },
+  {
+    path: '/hosts/:host_id',
+    name: 'HostDetail',
+    component: () => import('../views/HostDetail.vue')
+  },
+  {
+    path: '/alerts',
+    name: 'Alerts',
+    component: () => import('../views/Alerts.vue')
   }
 ]
 
