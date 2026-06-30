@@ -12,7 +12,7 @@ defineProps({
   status: {
     type: String,
     default: 'healthy',
-    validator: (v) => ['healthy', 'warning', 'critical'].includes(v)
+    validator: (v) => ['healthy', 'warning', 'critical', 'info'].includes(v)
   }
 })
 </script>
@@ -41,4 +41,5 @@ defineProps({
 .kpi-value.healthy { color: var(--healthy); }
 .kpi-value.warning { color: var(--warning); }
 .kpi-value.critical { color: var(--critical); }
+.kpi-value.info { color: var(--info); }
 </style>
