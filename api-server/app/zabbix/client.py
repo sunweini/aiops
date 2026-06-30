@@ -104,13 +104,23 @@ class ZabbixClient:
             "available": host.get("available", "1"),
         }
 
-    def get_all_hosts(self) -> list[dict]:
-        """Return all Zabbix hosts with their interfaces."""
+    # ---- hosts --------------------------------------------------------- #
+
+    def get_hosts_by_ips(self, ips: list[str]) -> list[dict]:
+        """Find Zabbix hosts matching the given IPs (single batch call).
+
+        Uses Zabbix ``search`` with ``searchByAny=True`` to match any of the IPs.
+        Only returns hosts that exist in Zabbix.
+        """
+        if not ips:
+            return []
+        # Zabbix search accepts list of values for a field
         result = self._rpc_call(
             "host.get",
             {
                 "output": ["hostid", "name", "status", "available"],
                 "selectInterfaces": ["ip"],
+                "filter": {"ip": ips},
             },
         )
         return [
@@ -136,15 +146,25 @@ class ZabbixClient:
             },
         )
 
-    def get_all_items(self) -> list[dict]:
-        """Return all monitoring items for all hosts in one call."""
-        return self._rpc_call(
-            "item.get",
-            {
-                "output": ["itemid", "key_", "name", "lastvalue", "hostid"],
-                "selectHosts": ["hostid"],
-            },
-        )
+    def get_items_by_hosts(self, hostids: list[str], keys: list[str] = None) -> list[dict]:
+        """Return monitoring items for specific hosts (single batch call).
+
+        Args:
+            hostids: List of Zabbix host IDs to query
+            keys: Optional list of item key patterns to filter (exact match or prefix)
+        """
+        if not hostids:
+            return []
+        params = {
+            "hostids": hostids,
+            "output": ["itemid", "key_", "name", "lastvalue", "hostid"],
+            "selectHosts": ["hostid"],
+        }
+        # Use search to filter by key if specified
+        if keys:
+            params["search"] = {"key_": keys}
+            params["searchByAny"] = True
+        return self._rpc_call("item.get", params)
 
     def get_latest_metrics(self, hostid: str, item_key_patterns: list[str]) -> dict:
         """Return latest values for items matching the given key patterns.

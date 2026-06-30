@@ -44,43 +44,80 @@ def _to_float(v):
 
 
 def _extract_metrics(items: list[dict]) -> dict:
-    """Extract metrics from items using the pattern matching logic."""
-    result = {}
-    for pattern in ITEM_KEY_PATTERNS:
-        for item in items:
-            key = item["key_"]
-            # Special case: system.cpu.util[] must not match system.cpu.util[,idle]
-            if pattern == "system.cpu.util[]":
-                if key == "system.cpu.util[]":
-                    result[pattern] = item.get("lastvalue", "N/A")
-                    break
-            # Exact match or prefix match
-            elif key == pattern or key.startswith(pattern) or pattern in key:
-                # Skip idle metrics when looking for CPU usage
-                if pattern == "system.cpu.util" and "idle" in key:
-                    continue
-                result[pattern] = item.get("lastvalue", "N/A")
-                break
+    """Extract metrics from items list, handling multiple key variants.
 
-    # Map to final metrics
-    cpu = result.get("system.cpu.util[]", result.get("system.cpu.util"))
-    mem = result.get("vm.memory.size[pavailable]", result.get("vm.memory.util"))
-    disk = result.get("vfs.fs.dependent.size[/,pused]",
-                      result.get("vfs.fs.size[/,pused]",
-                                 result.get("vfs.fs.size[C:,pused]")))
-    load = result.get("system.cpu.load[all,avg1]",
-                      result.get("system.cpu.load[percpu,avg1]"))
+    For disk metrics, we try to find (in order):
+    1. vfs.fs.dependent.size[/,pused] - percent used (new format)
+    2. vfs.fs.size[/,pused] - percent used (old format)
+    3. vfs.fs.size[C:,pused] - Windows C: drive
+    4. vfs.fs.size[/,pfree] - percent free, convert to used
+    """
+    cpu = None
+    memory = None
+    disk_used = None
+    disk_free = None
+    load = None
+
+    for item in items:
+        key = item.get("key_", "")
+        value = item.get("lastvalue", "N/A")
+
+        # Skip idle metrics
+        if "idle" in key:
+            continue
+
+        # CPU usage
+        if key.startswith("system.cpu.util") or key == "system.cpu.util[]":
+            if cpu is None and value != "N/A":
+                cpu = value
+
+        # Memory available percentage
+        elif key == "vm.memory.size[pavailable]":
+            if memory is None and value != "N/A":
+                memory = value
+
+        # Disk percent used (root partition)
+        elif key == "vfs.fs.dependent.size[/,pused]":
+            if disk_used is None and value != "N/A":
+                disk_used = value
+        elif key == "vfs.fs.size[/,pused]":
+            if disk_used is None and value != "N/A":
+                disk_used = value
+        elif key == "vfs.fs.size[C:,pused]":
+            if disk_used is None and value != "N/A":
+                disk_used = value
+
+        # Disk percent free (fallback - convert to used)
+        elif key == "vfs.fs.size[/,pfree]":
+            if disk_free is None and value != "N/A":
+                disk_free = value
+
+        # Load average (1 minute)
+        elif key == "system.cpu.load[all,avg1]" or key == "system.cpu.load[percpu,avg1]":
+            if load is None and value != "N/A":
+                load = value
+
+    # Use disk_used if available, otherwise convert disk_free
+    disk = disk_used
+    if disk is None and disk_free is not None:
+        try:
+            disk = str(100 - float(disk_free))
+        except (ValueError, TypeError):
+            pass
 
     return {
         "cpu": _to_float(cpu),
-        "memory": _to_float(mem),
+        "memory": _to_float(memory),
         "disk": _to_float(disk),
         "load1": _to_float(load),
     }
 
 
 def get_all_host_metrics() -> dict:
-    """Get metrics for all hosts in batch (2 API calls total, with 60s cache)."""
+    """Get metrics for specific hosts from topology (2 targeted API calls).
+
+    Only queries Zabbix for hosts in the rag-api topology, not all hosts.
+    """
     global _cache, _cache_time
 
     # Check cache first
@@ -89,21 +126,46 @@ def get_all_host_metrics() -> dict:
 
     client = get_client()
     try:
-        # Batch query: get all hosts (1 API call)
-        zabbix_hosts = client.get_all_hosts()
+        # Get target host IPs from rag-api topology
+        import httpx
+        import os
+        rag_base = os.environ.get('RAG_API_URL', 'http://localhost:8001').rstrip('/')
+        resp = httpx.get(f'{rag_base}/api/v1/topology/all', timeout=10)
+        topo = resp.json()
+        target_hosts = topo.get('hosts', [])  # [{id, name, ip}]
 
-        # Build IP -> hostid mapping and hostid -> availability
-        ip_to_hostid = {}
+        # Extract IPs we care about
+        target_ips = [h.get('ip') for h in target_hosts if h.get('ip')]
+        if not target_ips:
+            return {}
+
+        # Build IP -> host info mapping from topology
+        ip_to_info = {h['ip']: h for h in target_hosts if h.get('ip')}
+
+        # API call 1: Get ONLY our target hosts from Zabbix
+        zabbix_hosts = client.get_hosts_by_ips(target_ips)
+
+        # Build hostid -> IP mapping (from Zabbix interfaces)
+        hostid_to_ip = {}
         hostid_to_avail = {}
-        for h in zabbix_hosts:
-            hostid_to_avail[h["hostid"]] = h.get("available", "1")
-            for iface in h.get("interfaces", []):
+        for zh in zabbix_hosts:
+            hostid = zh["hostid"]
+            hostid_to_avail[hostid] = zh.get("available", "1")
+            for iface in zh.get("interfaces", []):
                 ip = iface.get("ip")
-                if ip:
-                    ip_to_hostid[ip] = h["hostid"]
+                if ip and ip in ip_to_info:
+                    hostid_to_ip[hostid] = ip
 
-        # Batch query: get all items (1 API call)
-        all_items = client.get_all_items()
+        # API call 2: Get ONLY specific metrics for ONLY our target hosts
+        # Filter to only the metric keys we need
+        metric_keys = [
+            "system.cpu.util",      # CPU usage
+            "vm.memory.size",       # Memory
+            "vfs.fs.dependent.size", # Disk (new Zabbix format)
+            "vfs.fs.size",          # Disk (old Zabbix format)
+            "system.cpu.load",      # Load
+        ]
+        all_items = client.get_items_by_hosts(list(hostid_to_ip.keys()), keys=metric_keys)
 
         # Group items by hostid
         items_by_host = {}
@@ -115,9 +177,9 @@ def get_all_host_metrics() -> dict:
                     items_by_host[hostid] = []
                 items_by_host[hostid].append(item)
 
-        # Build result: IP -> metrics
+        # Build result: IP -> metrics (only for hosts we care about)
         result = {}
-        for ip, hostid in ip_to_hostid.items():
+        for hostid, ip in hostid_to_ip.items():
             available = hostid_to_avail.get(hostid, "1") == "1"
             items = items_by_host.get(hostid, [])
             metrics = _extract_metrics(items) if items else {}
@@ -126,6 +188,12 @@ def get_all_host_metrics() -> dict:
                 "available": available,
                 "metrics": metrics
             }
+
+        # Also include offline hosts (not found in Zabbix)
+        found_ips = set(hostid_to_ip.values())
+        for ip in target_ips:
+            if ip not in found_ips:
+                result[ip] = {"available": False, "metrics": {}}
 
         # Update cache
         _cache = result
