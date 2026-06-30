@@ -1,8 +1,5 @@
 <template>
-  <div id="app">
-    <h1>AIOps 运维监控平台</h1>
-    <p>项目初始化成功</p>
-  </div>
+  <router-view />
 </template>
 
 <script setup>
