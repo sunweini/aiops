@@ -2,31 +2,45 @@
   <div class="host-detail">
     <button class="back-btn" @click="$router.push('/hosts')">← 返回主机列表</button>
 
-    <div class="info-card">
-      <div class="info-header">
-        <StatusBadge :status="host.available ? 'healthy' : 'critical'" />
-        <h2>{{ host.name || host.host_id }}</h2>
-        <span class="ip">{{ host.ip }}</span>
-      </div>
-      <div class="info-body">
-        <div class="info-row"><span>主机 ID</span><span class="mono">{{ host.host_id }}</span></div>
-        <div class="info-row"><span>CPU</span><span>{{ formatMetric(host.metrics?.cpu) }}</span></div>
-        <div class="info-row"><span>内存</span><span>{{ formatMetric(host.metrics?.memory) }}</span></div>
-        <div class="info-row"><span>磁盘</span><span>{{ formatMetric(host.metrics?.disk) }}</span></div>
-        <div class="info-row"><span>负载</span><span>{{ host.metrics?.load1 != null ? host.metrics.load1 : 'N/A' }}</span></div>
-      </div>
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">加载主机数据中...</p>
     </div>
 
-    <div class="panel">
-      <div class="panel-header">实时指标</div>
-      <div class="metric-cards">
-        <div class="metric-card" v-for="m in metrics" :key="m.key">
-          <div class="metric-val" :style="{ color: m.color }">{{ m.value }}</div>
-          <div class="metric-label">{{ m.label }}</div>
-          <div class="metric-bar"><div class="bar-fill" :style="{ width: m.barWidth, background: m.color }"></div></div>
+    <!-- Host Not Found -->
+    <div v-else-if="!host.host_id" class="not-found">
+      <p>主机未找到</p>
+    </div>
+
+    <!-- Host Details -->
+    <template v-else>
+      <div class="info-card">
+        <div class="info-header">
+          <StatusBadge :status="host.available ? 'healthy' : 'critical'" />
+          <h2>{{ host.name || host.host_id }}</h2>
+          <span class="ip">{{ host.ip }}</span>
+        </div>
+        <div class="info-body">
+          <div class="info-row"><span>主机 ID</span><span class="mono">{{ host.host_id }}</span></div>
+          <div class="info-row"><span>CPU</span><span>{{ formatMetric(host.metrics?.cpu) }}</span></div>
+          <div class="info-row"><span>内存</span><span>{{ formatMetric(host.metrics?.memory) }}</span></div>
+          <div class="info-row"><span>磁盘</span><span>{{ formatMetric(host.metrics?.disk) }}</span></div>
+          <div class="info-row"><span>负载</span><span>{{ host.metrics?.load1 != null ? host.metrics.load1 : 'N/A' }}</span></div>
         </div>
       </div>
-    </div>
+
+      <div class="panel">
+        <div class="panel-header">实时指标</div>
+        <div class="metric-cards">
+          <div class="metric-card" v-for="m in metrics" :key="m.key">
+            <div class="metric-val" :style="{ color: m.color }">{{ m.value }}</div>
+            <div class="metric-label">{{ m.label }}</div>
+            <div class="metric-bar"><div class="bar-fill" :style="{ width: m.barWidth, background: m.color }"></div></div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -37,15 +51,19 @@ import StatusBadge from '../components/common/StatusBadge.vue'
 
 const route = useRoute()
 const host = ref({ metrics: {} })
+const loading = ref(true)
 
 onMounted(async () => {
   try {
+    loading.value = true
     const res = await fetch('/api/v1/hosts/status')
     const data = await res.json()
     const found = (data.hosts || []).find(h => h.host_id === route.params.host_id)
     if (found) host.value = found
   } catch (e) {
     console.error(e)
+  } finally {
+    loading.value = false
   }
 })
 
@@ -122,4 +140,39 @@ function formatMetric(v) { return v != null ? v + '%' : 'N/A' }
 }
 .metric-label { font-size: var(--font-xs); color: var(--text-secondary); margin: 4px 0; }
 .metric-bar { height: 6px; background: var(--bg-canvas); border-radius: 3px; overflow: hidden; }
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  min-height: 200px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--text-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  margin-top: var(--space-md);
+  color: var(--text-secondary);
+  font-size: var(--font-md);
+}
+
+.not-found {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-secondary);
+}
 </style>
