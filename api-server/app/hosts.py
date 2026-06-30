@@ -73,10 +73,16 @@ def _extract_metrics(items: list[dict]) -> dict:
             if cpu is None and value != "N/A":
                 cpu = value
 
-        # Memory available percentage
+        # Memory available percentage (Linux)
         elif key == "vm.memory.size[pavailable]":
             if memory is None and value != "N/A":
                 memory = value
+
+        # Memory usage percentage (Windows)
+        elif key == "vm.memory.util":
+            if memory is None and value != "N/A":
+                # Windows reports usage %, convert to available %
+                memory = str(100 - float(value))
 
         # Disk percent used (root partition)
         elif key == "vfs.fs.dependent.size[/,pused]":
@@ -167,10 +173,11 @@ def get_hosts_from_zabbix() -> dict:
         # Get metrics for all hosts
         metric_keys = [
             "system.cpu.util",
-            "vm.memory.size",
-            "vfs.fs.dependent.size",
-            "vfs.fs.size",
-            "system.cpu.load",
+            "vm.memory.size",       # Memory (Linux)
+            "vm.memory.util",       # Memory (Windows)
+            "vfs.fs.dependent.size", # Disk (new)
+            "vfs.fs.size",          # Disk (old)
+            "system.cpu.load",      # Load
         ]
         all_items = client.get_items_by_hosts(list(hostid_to_ip.keys()), keys=metric_keys)
 
@@ -259,9 +266,10 @@ def get_all_host_metrics() -> dict:
         # Filter to only the metric keys we need
         metric_keys = [
             "system.cpu.util",      # CPU usage
-            "vm.memory.size",       # Memory
-            "vfs.fs.dependent.size", # Disk (new Zabbix format)
-            "vfs.fs.size",          # Disk (old Zabbix format)
+            "vm.memory.size",       # Memory (Linux)
+            "vm.memory.util",       # Memory (Windows)
+            "vfs.fs.dependent.size", # Disk (new)
+            "vfs.fs.size",          # Disk (old)
             "system.cpu.load",      # Load
         ]
         all_items = client.get_items_by_hosts(list(hostid_to_ip.keys()), keys=metric_keys)
