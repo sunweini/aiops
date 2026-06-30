@@ -1,0 +1,16 @@
+services:
+  aiops-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiops-api
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - RAG_API_URL=http://localhost:8001
+    volumes:
+      - api-data:/app/data
+
+volumes:
+  api-data:
+    driver: local
