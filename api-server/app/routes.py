@@ -155,24 +155,43 @@ async def delete_user(user_id: int):
     return {"status": "ok"}
 
 
-# ---- Host Status (proxied from rag) ----
+# ---- Host Status (topology + Zabbix metrics) ----
 
 @router.get("/hosts/status")
 async def hosts_status():
     import httpx
+    from app.hosts import get_host_metrics
     try:
         resp = httpx.get(RAG_API_BASE + "/topology/all", timeout=10)
         data = resp.json()
-        hosts = data.get("hosts", [])
-        return {
-            "hosts": [
-                {"host_id": h["id"], "name": h.get("name", ""), "ip": h.get("ip", ""), "available": True, "metrics": {}}
-                for h in hosts
-            ],
-            "summary": {"total": len(hosts), "online": len(hosts), "offline": 0}
-        }
+        raw_hosts = data.get("hosts", [])
     except Exception as e:
         return {"hosts": [], "summary": {"total": 0, "online": 0, "offline": 0}, "error": str(e)}
+
+    hosts = []
+    online = 0
+    for h in raw_hosts:
+        ip = h.get("ip", "")
+        if ip:
+            info = get_host_metrics(ip)
+        else:
+            info = {"available": False, "metrics": {}}
+
+        host_entry = {
+            "host_id": h.get("id", ""),
+            "name": h.get("name", ""),
+            "ip": ip,
+            "available": info["available"],
+            "metrics": info["metrics"]
+        }
+        hosts.append(host_entry)
+        if info["available"]:
+            online += 1
+
+    return {
+        "hosts": hosts,
+        "summary": {"total": len(hosts), "online": online, "offline": len(hosts) - online}
+    }
 
 
 # ---- Topology (proxied from rag) ----
