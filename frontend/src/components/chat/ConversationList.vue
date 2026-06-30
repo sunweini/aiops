@@ -8,12 +8,14 @@
       :key="conv.conversation_id"
       class="conv-item"
       :class="{ active: conv.conversation_id === activeId }"
-      @click="$emit('select', conv.conversation_id)"
     >
-      <div class="conv-title">{{ conv.title }}</div>
-      <div class="conv-meta">
-        {{ conv.turn_count }} 轮 · {{ formatTime(conv.created_at) }}
+      <div class="conv-main" @click="$emit('select', conv.conversation_id)">
+        <div class="conv-title">{{ conv.title }}</div>
+        <div class="conv-meta">
+          {{ conv.turn_count }} 轮 · {{ formatTime(conv.created_at) }}
+        </div>
       </div>
+      <button class="delete-btn" @click.stop="$emit('delete', conv.conversation_id)" title="删除对话">✕</button>
     </div>
   </div>
 </template>
@@ -31,7 +33,7 @@ defineProps({
   activeId: { type: String, default: null }
 })
 
-defineEmits(['new', 'select'])
+defineEmits(['new', 'select', 'delete'])
 
 const formatTime = (ts) => dayjs(ts).fromNow()
 </script>
@@ -61,9 +63,9 @@ const formatTime = (ts) => dayjs(ts).fromNow()
 }
 
 .conv-item {
-  padding: 10px 12px;
+  display: flex;
+  align-items: center;
   border-radius: var(--radius-sm);
-  cursor: pointer;
   transition: background 0.15s;
 }
 
@@ -74,6 +76,40 @@ const formatTime = (ts) => dayjs(ts).fromNow()
 .conv-item.active {
   background: var(--bg-elevated);
   border-left: 3px solid var(--info);
+}
+
+.conv-main {
+  flex: 1;
+  padding: 10px 12px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.delete-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-disabled);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.conv-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  color: var(--critical);
+  background: rgba(242, 73, 92, 0.1);
 }
 
 .conv-title {

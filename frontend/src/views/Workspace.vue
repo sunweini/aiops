@@ -2,12 +2,16 @@
   <div class="workspace">
     <!-- 对话历史侧栏 -->
     <aside class="history-sidebar">
-      <div class="sidebar-header">对话历史</div>
+      <div class="sidebar-header">
+        对话历史
+        <button v-if="chatStore.conversations.length" class="clear-btn" @click="handleClear">清空</button>
+      </div>
       <ConversationList
         :conversations="chatStore.conversations"
         :activeId="chatStore.currentId"
         @new="handleNew"
         @select="handleSelect"
+        @delete="handleDelete"
       />
     </aside>
 
@@ -35,9 +39,15 @@
           @source-click="handleSourceClick"
         />
 
-        <!-- 限制提示 -->
-        <div v-if="!chatStore.canSend && chatStore.messages.length" class="limit-warning">
-          已达对话限制（20 轮 / 128K token）
+        <!-- 发送中提示 -->
+        <div v-if="chatStore.sending" class="sending-hint">
+          <div class="sending-dot"></div>
+          <span>正在查询知识库...</span>
+        </div>
+
+        <!-- 限制提示（仅在非发送状态且真正达到限制时显示） -->
+        <div v-if="!chatStore.canSend && !chatStore.sending && chatStore.turnCount >= 20" class="limit-warning">
+          已达最大对话轮数限制（20 轮）
         </div>
       </div>
 
@@ -77,6 +87,16 @@ async function handleNew() {
 
 function handleSelect(id) {
   chatStore.selectConversation(id)
+}
+
+async function handleDelete(id) {
+  await chatStore.deleteConversation(id)
+}
+
+async function handleClear() {
+  if (confirm('确定清空所有对话？')) {
+    await chatStore.clearConversations()
+  }
 }
 
 async function handleSend(query) {
@@ -122,12 +142,30 @@ function formatTokens(tokens) {
 }
 
 .sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--font-md);
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-sm);
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.clear-btn {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-disabled);
+  cursor: pointer;
+  font-size: var(--font-xs);
+}
+
+.clear-btn:hover {
+  color: var(--text-secondary);
+  border-color: var(--critical);
 }
 
 .chat-area {
@@ -204,5 +242,27 @@ function formatTokens(tokens) {
   color: var(--text-disabled);
   margin-bottom: 4px;
   padding-right: 4px;
+}
+/* 发送中提示 */
+.sending-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px var(--space-md);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+}
+
+.sending-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--info);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
 </style>

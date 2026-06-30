@@ -242,3 +242,14 @@ async def topology_all():
 @router.get("/alerts/active")
 async def alerts_active():
     return {"alerts": [], "total": 0}
+
+
+# ---- Delete Conversation ----
+
+@router.delete("/conversations/{conv_id}")
+async def delete_conversation(conv_id: str):
+    """Delete a conversation and all its messages."""
+    from app.chat.db import delete_conversation as _delete
+    if not _delete(conv_id):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"status": "ok"}

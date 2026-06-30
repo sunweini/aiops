@@ -110,11 +110,35 @@ export const useChatStore = defineStore('chat', () => {
     totalTokens.value = 0
   }
 
+  // 删除对话
+  async function deleteConversation(id) {
+    try {
+      await fetch(`/api/v1/conversations/${id}`, { method: 'DELETE' })
+      conversations.value = conversations.value.filter(c => c.conversation_id !== id)
+      if (currentId.value === id) {
+        currentId.value = null
+        messages.value = []
+        turnCount.value = 0
+        totalTokens.value = 0
+      }
+    } catch (e) {
+      console.error('Failed to delete conversation:', e)
+    }
+  }
+
+  // 清空所有对话
+  async function clearConversations() {
+    for (const c of [...conversations.value]) {
+      await deleteConversation(c.conversation_id)
+    }
+  }
+
   return {
     conversations, currentId, messages,
     sending, turnCount, totalTokens,
     currentConversation, canSend,
     loadConversations, newConversation,
-    send, selectConversation
+    send, selectConversation,
+    deleteConversation, clearConversations
   }
 })

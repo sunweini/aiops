@@ -126,3 +126,13 @@ def get_conversation(conv_id):
         'turn_count': row['turn_count'],
         'total_tokens': row['total_tokens']
     }
+
+
+def delete_conversation(conv_id: str) -> bool:
+    """Delete a conversation and all its messages."""
+    conn = _get_conn()
+    conn.execute('DELETE FROM messages WHERE conversation_id = ?', (conv_id,))
+    cursor = conn.execute('DELETE FROM conversations WHERE id = ?', (conv_id,))
+    conn.commit()
+    conn.close()
+    return cursor.rowcount > 0

@@ -2,12 +2,17 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
+const http = axios.create({
+  timeout: 120000,
+  headers: { 'Content-Type': 'application/json' }
+})
+
 /**
  * 获取对话历史列表
  * GET /api/v1/conversations
  */
 export async function fetchConversations() {
-  const res = await axios.get(`${API_BASE}/conversations`)
+  const res = await http.get(`${API_BASE}/conversations`)
   return res.data
 }
 
@@ -16,7 +21,7 @@ export async function fetchConversations() {
  * POST /api/v1/conversations
  */
 export async function createConversation(title) {
-  const res = await axios.post(`${API_BASE}/conversations`, { title })
+  const res = await http.post(`${API_BASE}/conversations`, { title })
   return res.data
 }
 
@@ -27,7 +32,7 @@ export async function createConversation(title) {
 export async function sendMessage(conversationId, query, context) {
   const payload = { query }
   if (context) payload.context = context
-  const res = await axios.post(
+  const res = await http.post(
     `${API_BASE}/conversations/${conversationId}/messages`,
     payload
   )

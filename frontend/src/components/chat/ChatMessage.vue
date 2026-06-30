@@ -27,6 +27,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { marked } from 'marked'
 
 const props = defineProps({
   message: { type: Object, required: true }
@@ -34,38 +35,19 @@ const props = defineProps({
 
 defineEmits(['source-click'])
 
-// 简单 Markdown -> HTML 转换（支持代码块、粗体、列表）
+// 使用 marked 库渲染 Markdown
 const renderedContent = computed(() => {
-  let html = props.message.content || ''
-
-  // 代码块
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-    `<pre><code class="lang-${lang}">${escapeHtml(code.trim())}</code></pre>`
-  )
-
-  // 行内代码
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
-
-  // 粗体
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-
-  // 换行
-  html = html.replace(/\n/g, '<br>')
-
-  return html
+  if (!props.message.content) return ''
+  return marked.parse(props.message.content, {
+    breaks: true,
+    gfm: true
+  })
 })
 
 const confidenceLabel = computed(() => {
   const labels = { high: '🟢 高', medium: '🟡 中', low: '🔴 低' }
   return labels[props.message.confidence] || '🟡 中'
 })
-
-function escapeHtml(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
 </script>
 
 <style scoped>
@@ -136,6 +118,43 @@ function escapeHtml(text) {
 .content :deep(pre code) {
   background: none;
   padding: 0;
+}
+
+.content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.content :deep(th), .content :deep(td) {
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  font-size: var(--font-sm);
+}
+
+.content :deep(th) {
+  background: var(--bg-elevated);
+  font-weight: 600;
+}
+
+.content :deep(ul), .content :deep(ol) {
+  padding-left: 20px;
+  margin: 4px 0;
+}
+
+.content :deep(li) {
+  margin: 2px 0;
+}
+
+.content :deep(h1), .content :deep(h2), .content :deep(h3) {
+  font-family: var(--font-display);
+  margin: 12px 0 6px;
+}
+
+.content :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 12px 0;
 }
 
 .sources {
