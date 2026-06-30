@@ -8,6 +8,8 @@ from fastapi import APIRouter, HTTPException
 
 RAG_API_BASE = os.environ.get('RAG_API_URL', 'http://host.docker.internal:8001').rstrip('/') + '/api/v1'
 
+from app.hosts import _is_vip_host
+
 router = APIRouter()
 
 
@@ -158,42 +160,64 @@ async def delete_user(user_id: int):
 # ---- Host Status (topology + Zabbix metrics) ----
 
 @router.get("/hosts/status")
-async def hosts_status():
-    """Get all hosts with metrics (optimized: 2 Zabbix API calls total)."""
+async def hosts_status(source: str = "topology"):
+    """Get all hosts with metrics (optimized: 2 Zabbix API calls total).
+
+    Args:
+        source: "topology" (from Neo4j) or "zabbix" (direct from Zabbix)
+    """
     import httpx
-    from app.hosts import get_all_host_metrics
+    from app.hosts import get_all_host_metrics, get_hosts_from_zabbix
 
     try:
-        # Get topology from rag-api
-        resp = httpx.get(RAG_API_BASE + "/topology/all", timeout=10)
-        data = resp.json()
-        raw_hosts = data.get("hosts", [])
-    except Exception as e:
-        return {"hosts": [], "summary": {"total": 0, "online": 0, "offline": 0}, "error": str(e)}
+        if source == "zabbix":
+            # Get hosts directly from Zabbix (bypass topology)
+            all_metrics = get_hosts_from_zabbix()
+            hosts = []
+            online = 0
+            for ip, info in all_metrics.items():
+                host_entry = {
+                    "host_id": info.get("hostid", ""),
+                    "name": info.get("name", ""),
+                    "ip": ip,
+                    "available": info.get("available", False),
+                    "metrics": info.get("metrics", {})
+                }
+                hosts.append(host_entry)
+                if info.get("available"):
+                    online += 1
+        else:
+            # Get hosts from topology (default)
+            try:
+                resp = httpx.get(RAG_API_BASE + "/topology/all", timeout=10)
+                data = resp.json()
+                raw_hosts = data.get("hosts", [])
+                # Filter out VIP hosts
+                raw_hosts = [h for h in raw_hosts if not _is_vip_host(h)]
+            except Exception as e:
+                return {"hosts": [], "summary": {"total": 0, "online": 0, "offline": 0}, "error": str(e)}
 
-    # Batch query Zabbix (2 API calls: hosts + items)
-    try:
-        all_metrics = get_all_host_metrics()
+            all_metrics = get_all_host_metrics()
+
+            hosts = []
+            online = 0
+            for h in raw_hosts:
+                ip = h.get("ip", "")
+                info = all_metrics.get(ip, {"available": False, "metrics": {}})
+
+                host_entry = {
+                    "host_id": h.get("id", ""),
+                    "name": h.get("name", ""),
+                    "ip": ip,
+                    "available": info["available"],
+                    "metrics": info["metrics"]
+                }
+                hosts.append(host_entry)
+                if info["available"]:
+                    online += 1
     except Exception as e:
         print(f"Batch metrics failed: {e}")
-        all_metrics = {}
-
-    hosts = []
-    online = 0
-    for h in raw_hosts:
-        ip = h.get("ip", "")
-        info = all_metrics.get(ip, {"available": False, "metrics": {}})
-
-        host_entry = {
-            "host_id": h.get("id", ""),
-            "name": h.get("name", ""),
-            "ip": ip,
-            "available": info["available"],
-            "metrics": info["metrics"]
-        }
-        hosts.append(host_entry)
-        if info["available"]:
-            online += 1
+        return {"hosts": [], "summary": {"total": 0, "online": 0, "offline": 0}, "error": str(e)}
 
     return {
         "hosts": hosts,

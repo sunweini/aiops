@@ -84,6 +84,29 @@ class ZabbixClient:
 
     # ---- hosts --------------------------------------------------------- #
 
+    def get_all_hosts(self) -> list[dict]:
+        """Get all hosts from Zabbix (single API call).
+
+        Returns list of hosts with their interfaces.
+        """
+        result = self._rpc_call(
+            "host.get",
+            {
+                "output": ["hostid", "name", "status", "available"],
+                "selectInterfaces": ["ip"],
+            },
+        )
+        return [
+            {
+                "hostid": h["hostid"],
+                "name": h["name"],
+                "status": h["status"],
+                "available": h.get("available", "1"),
+                "interfaces": h.get("interfaces", []),
+            }
+            for h in result
+        ]
+
     def get_host_by_ip(self, ip: str) -> dict | None:
         """Find a Zabbix host by interface IP.
 

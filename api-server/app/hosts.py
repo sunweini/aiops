@@ -20,9 +20,11 @@ ITEM_KEY_PATTERNS = [
 # Singleton client
 _client = None
 
-# Simple in-memory cache (60 seconds TTL)
-_cache = {}
-_cache_time = 0
+# Separate caches for topology-based and Zabbix-based queries
+_cache_topology = {}
+_cache_topology_time = 0
+_cache_zabbix = {}
+_cache_zabbix_time = 0
 CACHE_TTL = 60
 
 
@@ -113,16 +115,110 @@ def _extract_metrics(items: list[dict]) -> dict:
     }
 
 
+def _is_vip_host(host_info: dict) -> bool:
+    """Check if a host is a VIP (Virtual IP) host that should be excluded from monitoring."""
+    name = (host_info.get('name') or '').lower()
+    host_id = (host_info.get('id') or '').lower()
+    # Filter out VIP hosts (case-insensitive)
+    return 'vip' in name or 'vip' in host_id
+
+
+def get_hosts_from_zabbix() -> dict:
+    """Get all hosts directly from Zabbix (bypassing Neo4j topology).
+
+    This ensures we always have the latest host list even if topology is outdated.
+    """
+    global _cache_zabbix, _cache_zabbix_time
+
+    # Check cache first
+    if _cache_zabbix and (time.time() - _cache_zabbix_time) < CACHE_TTL:
+        return _cache_zabbix
+
+    client = get_client()
+    try:
+        # Get all hosts from Zabbix
+        all_zabbix_hosts = client.get_all_hosts()
+
+        # Filter out VIP hosts
+        all_zabbix_hosts = [h for h in all_zabbix_hosts if not _is_vip_host({
+            'name': h.get('name', ''),
+            'id': h.get('hostid', '')
+        })]
+
+        # Build hostid -> IP mapping
+        hostid_to_ip = {}
+        hostid_to_info = {}
+        for zh in all_zabbix_hosts:
+            hostid = zh["hostid"]
+            for iface in zh.get("interfaces", []):
+                ip = iface.get("ip")
+                if ip:
+                    hostid_to_ip[hostid] = ip
+                    hostid_to_info[ip] = {
+                        'hostid': hostid,
+                        'name': zh.get('name', ''),
+                        'available': zh.get("available", "1")
+                    }
+                    break
+
+        if not hostid_to_ip:
+            return {}
+
+        # Get metrics for all hosts
+        metric_keys = [
+            "system.cpu.util",
+            "vm.memory.size",
+            "vfs.fs.dependent.size",
+            "vfs.fs.size",
+            "system.cpu.load",
+        ]
+        all_items = client.get_items_by_hosts(list(hostid_to_ip.keys()), keys=metric_keys)
+
+        # Group items by hostid
+        items_by_host = {}
+        for item in all_items:
+            hosts = item.get("hosts", [])
+            if hosts:
+                hostid = hosts[0]["hostid"]
+                if hostid not in items_by_host:
+                    items_by_host[hostid] = []
+                items_by_host[hostid].append(item)
+
+        # Build result
+        result = {}
+        for hostid, ip in hostid_to_ip.items():
+            info = hostid_to_info.get(ip, {})
+            available = info.get("available", "1") == "1"
+            items = items_by_host.get(hostid, [])
+            metrics = _extract_metrics(items) if items else {}
+
+            result[ip] = {
+                "available": available,
+                "metrics": metrics,
+                "name": info.get("name", "")
+            }
+
+        # Update cache
+        _cache_zabbix = result
+        _cache_zabbix_time = time.time()
+
+        return result
+    except Exception as e:
+        print(f"Zabbix batch metrics error: {e}")
+        return {}
+
+
 def get_all_host_metrics() -> dict:
     """Get metrics for specific hosts from topology (2 targeted API calls).
 
     Only queries Zabbix for hosts in the rag-api topology, not all hosts.
+    Automatically excludes VIP hosts from monitoring.
     """
-    global _cache, _cache_time
+    global _cache_topology, _cache_topology_time
 
     # Check cache first
-    if _cache and (time.time() - _cache_time) < CACHE_TTL:
-        return _cache
+    if _cache_topology and (time.time() - _cache_topology_time) < CACHE_TTL:
+        return _cache_topology
 
     client = get_client()
     try:
@@ -133,6 +229,9 @@ def get_all_host_metrics() -> dict:
         resp = httpx.get(f'{rag_base}/api/v1/topology/all', timeout=10)
         topo = resp.json()
         target_hosts = topo.get('hosts', [])  # [{id, name, ip}]
+
+        # Filter out VIP hosts
+        target_hosts = [h for h in target_hosts if not _is_vip_host(h)]
 
         # Extract IPs we care about
         target_ips = [h.get('ip') for h in target_hosts if h.get('ip')]
@@ -196,8 +295,8 @@ def get_all_host_metrics() -> dict:
                 result[ip] = {"available": False, "metrics": {}}
 
         # Update cache
-        _cache = result
-        _cache_time = time.time()
+        _cache_topology = result
+        _cache_topology_time = time.time()
 
         return result
     except Exception as e:
