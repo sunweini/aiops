@@ -1,0 +1,67 @@
+:root {
+  /* Background layers */
+  --bg-canvas: #0a0e1a;
+  --bg-surface: #131926;
+  --bg-elevated: #1c2433;
+  --border-subtle: #2c3235;
+
+  /* Text */
+  --text-primary: rgba(255, 255, 255, 0.87);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-disabled: rgba(255, 255, 255, 0.30);
+
+  /* Status */
+  --critical: #F2495C;
+  --warning: #FADE2A;
+  --healthy: #73BF69;
+  --info: #5794F2;
+  --unknown: #8E8E8E;
+
+  /* Fault propagation */
+  --fault-root: #FF4D4D;
+  --fault-path: #F2495C;
+  --fault-blast: rgba(242, 73, 92, 0.15);
+
+  /* Typography */
+  --font-display: 'Instrument Sans', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-data: 'Geist Mono', monospace;
+
+  /* Font sizes */
+  --font-xs: 11px;
+  --font-sm: 12px;
+  --font-md: 13px;
+  --font-lg: 16px;
+  --font-xl: 24px;
+  --font-2xl: 32px;
+  --font-3xl: 36px;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--font-md);
+  line-height: 1.5;
+}
