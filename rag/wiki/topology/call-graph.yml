@@ -2,9 +2,9 @@ services:
 - id: svc_es
   name: elasticsearch
   aliases:
-    - "es"
-    - "弹性搜索"
-    - "es集群"
+  - es
+  - 弹性搜索
+  - es集群
   deploys_on: host_es_master_01
   calls:
   - target: svc_es
@@ -31,7 +31,10 @@ services:
     ip: 10.33.17.104
 - id: svc_kibana
   name: kibana
-  aliases: ["kibana", "可视分析", "日志看板"]
+  aliases:
+  - kibana
+  - 可视分析
+  - 日志看板
   deploys_on: host_es_master_01
   calls:
   - target: svc_es
@@ -41,7 +44,9 @@ services:
   - 5601
 - id: svc_logstash
   name: logstash
-  aliases: ["logstash", "日志收集"]
+  aliases:
+  - logstash
+  - 日志收集
   deploys_on: host_logstash_01
   calls:
   - target: svc_es
@@ -58,7 +63,10 @@ services:
     role: Syslog + Beats 入口
 - id: svc_syslog
   name: syslog-input
-  aliases: ["syslog", "系统日志", "syslog-input"]
+  aliases:
+  - syslog
+  - 系统日志
+  - syslog-input
   deploys_on: host_logstash_01
   calls:
   - target: svc_logstash
@@ -69,7 +77,10 @@ services:
   - 514
 - id: svc_beats
   name: beats-input
-  aliases: ["beats", "beats-input", "数据采集"]
+  aliases:
+  - beats
+  - beats-input
+  - 数据采集
   deploys_on: host_logstash_01
   calls:
   - target: svc_logstash
@@ -79,7 +90,9 @@ services:
   - 5555
 - id: svc_logstash_vip
   name: logstash-vip
-  aliases: ["logstash-vip", "vip-logstash"]
+  aliases:
+  - logstash-vip
+  - vip-logstash
   deploys_on: host_logstash_vip
   ports:
   - 5514
@@ -97,7 +110,11 @@ services:
     port: 5555
 - id: svc_nginx_company
   name: company-nginx-cluster
-  aliases: ["nginx", "company-nginx", "nginx代理", "ops-nginx"]
+  aliases:
+  - nginx
+  - company-nginx
+  - nginx代理
+  - ops-nginx
   deploys_on: host_nginx_01
   ports:
   - 80
@@ -122,7 +139,11 @@ services:
     port: 9999
 - id: svc_app01
   name: K3Cloud应用服务01
-  aliases: ["k3cloud01", "app01", "应用服务01", "K3Cloud01"]
+  aliases:
+  - k3cloud01
+  - app01
+  - 应用服务01
+  - K3Cloud01
   deploys_on: host_app01
   ports:
   - 9999
@@ -149,7 +170,11 @@ services:
   description: K3Cloud 应用服务，ERP 应用层，部署于 Windows Server
 - id: svc_app02
   name: K3Cloud应用服务02
-  aliases: ["k3cloud02", "app02", "应用服务02", "K3Cloud02"]
+  aliases:
+  - k3cloud02
+  - app02
+  - 应用服务02
+  - K3Cloud02
   deploys_on: host_app02
   ports:
   - 9599
@@ -176,7 +201,10 @@ services:
   description: K3Cloud 应用服务，ERP 应用层，部署于 Windows Server
 - id: svc_file_server
   name: 文件服务器
-  aliases: ["文件服务器", "file-server", "ftp"]
+  aliases:
+  - 文件服务器
+  - file-server
+  - ftp
   deploys_on: host_file
   ports:
   - 80
@@ -187,14 +215,21 @@ services:
     port: 8000
 - id: svc_mgmt_center
   name: 管理中心服务
-  aliases: ["管理中心", "mgmt-center", "管理后台"]
+  aliases:
+  - 管理中心
+  - mgmt-center
+  - 管理后台
   deploys_on: host_mgmt
   ports:
   - 8000
   calls: []
 - id: svc_db_alwayson
   name: SQLServer AlwaysOn 集群
-  aliases: ["sqlserver", "db-cluster", "数据库集群", "mssql"]
+  aliases:
+  - sqlserver
+  - db-cluster
+  - 数据库集群
+  - mssql
   deploys_on: host_db_master
   ports:
   - 1433
@@ -214,7 +249,10 @@ services:
   calls: []
 - id: svc_erp_relay_main
   name: ERP消息推送中转服务-主
-  aliases: ["erp-中转主", "erp-relay", "erp推送主"]
+  aliases:
+  - erp-中转主
+  - erp-relay
+  - erp推送主
   deploys_on: host_erp_relay_main
   ports:
   - 8088
@@ -233,7 +271,10 @@ services:
     port: 8088
 - id: svc_erp_relay_backup
   name: ERP消息推送中转服务-备
-  aliases: ["erp-中转备", "erp-relay-bak", "erp推送备"]
+  aliases:
+  - erp-中转备
+  - erp-relay-bak
+  - erp推送备
   deploys_on: host_erp_relay_backup
   ports:
   - 8088
@@ -243,7 +284,10 @@ services:
     port: 1433
 - id: svc_qys_relay_main
   name: 契约锁中转服务-主
-  aliases: ["qys-中转主", "契约锁主", "qys-relay"]
+  aliases:
+  - qys-中转主
+  - 契约锁主
+  - qys-relay
   deploys_on: host_qys_relay_main
   ports:
   - 5962
@@ -268,7 +312,10 @@ services:
     port: 5962
 - id: svc_qys_relay_backup
   name: 契约锁中转服务-备
-  aliases: ["qys-中转备", "契约锁备", "qys-relay-bak"]
+  aliases:
+  - qys-中转备
+  - 契约锁备
+  - qys-relay-bak
   deploys_on: host_qys_relay_backup
   ports:
   - 5962
@@ -278,7 +325,10 @@ services:
     port: 1433
 - id: svc_tianqu_relay_main
   name: 天枢中转服务-主
-  aliases: ["天枢中转主", "tianqu-relay", "天枢主"]
+  aliases:
+  - 天枢中转主
+  - tianqu-relay
+  - 天枢主
   deploys_on: host_tianqu_relay_main
   ports:
   - 5962
@@ -300,7 +350,10 @@ services:
     port: 5962
 - id: svc_tianqu_relay_backup
   name: 天枢中转服务-备
-  aliases: ["天枢中转备", "tianqu-relay-bak", "天枢备"]
+  aliases:
+  - 天枢中转备
+  - tianqu-relay-bak
+  - 天枢备
   deploys_on: host_tianqu_relay_backup
   ports:
   - 5962
@@ -310,7 +363,11 @@ services:
     port: 1433
 - id: svc_k3s
   name: k3s-cluster
-  aliases: ["k3s", "k8s", "k3s-cluster", "容器集群"]
+  aliases:
+  - k3s
+  - k8s
+  - k3s-cluster
+  - 容器集群
   deploys_on: host_k3s_master
   ports:
   - 6443
@@ -341,7 +398,10 @@ services:
   calls: []
 - id: svc_pangu_gateway
   name: pangu-gateway-service
-  aliases: ["pangu-gateway", "盘古网关", "pgw"]
+  aliases:
+  - pangu-gateway
+  - 盘古网关
+  - pgw
   vip: 10.33.16.177
   deploys_on: host_pangu_gateway_02
   ports:
@@ -358,7 +418,11 @@ services:
     ip: 10.33.16.175
 - id: svc_pangu_go
   name: pangu-go-services
-  aliases: ["pangu-go", "盘古go", "msg-api", "pangu"]
+  aliases:
+  - pangu-go
+  - 盘古go
+  - msg-api
+  - pangu
   deploys_on: host_pangu_go_01
   ports:
   - 443
@@ -402,7 +466,11 @@ services:
     ip: 10.33.16.16
 - id: svc_pangu_mq
   name: pangu-rabbitmq-cluster
-  aliases: ["pangu-mq", "rabbitmq", "盘古消息队列", "rmq"]
+  aliases:
+  - pangu-mq
+  - rabbitmq
+  - 盘古消息队列
+  - rmq
   deploys_on: host_pangu_mq_01
   ports:
   - 5672
@@ -422,6 +490,16 @@ services:
   - host: host_pangu_mq_03
     role: Slave
     ip: 10.33.16.143
+- id: svc_pangu_db
+  name: pangu-mysql-cluster
+  deploys_on: host_pangu_db_master
+  ports:
+  - 3306
+- id: svc_pangu_etcd
+  name: pangu-etcd-cluster
+  deploys_on: host_pangu_mq_01
+  ports:
+  - 2380
 hosts:
 - id: host_es_master_01
   name: master-1
@@ -551,4 +629,12 @@ hosts:
 - id: host_pangu_go_02
   name: pangu_go_10.33.16.139
   ip: 10.33.16.139
+  os: CentOS 7
+- id: host_pangu_db_slave
+  name: dbm1-slave
+  ip: 10.33.16.140
+  os: CentOS 7
+- id: host_pangu_db_master
+  name: dbm1
+  ip: 10.33.16.144
   os: CentOS 7

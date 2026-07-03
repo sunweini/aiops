@@ -41,6 +41,22 @@ from datetime import date
 API = "http://localhost:8001/api/v1"
 
 
+_NODE_PROPS = {
+    "Service":  {"id", "name", "status", "description", "aliases"},
+    "Host":     {"id", "name", "ip", "os"},
+    "Port":     {"number", "protocol", "status"},
+    "Document": {"id", "title", "type", "updated_at"},
+    "Cluster":  {"service_id", "name", "vip"},
+}
+
+# 用户常见误用 → 正确归属提示
+_PROP_HINTS = {
+    "vip":   "'vip' 是 Cluster 的属性。正确: update-node Cluster <svc_id> vip <value>",
+    "role":  "'role' 是 PART_OF 关系的属性（host 在集群中的角色），不是 Host 节点属性",
+    "ports": "'ports' 在 Neo4j 里是独立 Port 节点（HAS_PORT 连到 Host），不是 Service 属性",
+}
+
+
 def _api_post(path: str, data: dict = None) -> dict:
     """POST JSON to RAG API, return parsed response."""
     body = json.dumps(data or {}).encode()
@@ -136,6 +152,25 @@ def _parse_write_args(args, svc_pos):
     return body, tags
 
 
+
+def _write_cmd(argv, fn, svc_pos):
+    """分发 write-tech / write-sop / write-incident 命令。
+
+    argv: sys.argv
+    fn: write_sop / write_tech / write_incident
+    svc_pos: 最后一个位置参数的索引
+             write-sop = 3 (cmd, svc_id, sop_type)
+             write-tech / write-incident = 2 (cmd, svc_id)
+    """
+    service_id = argv[2]
+    body, tags = _parse_write_args(argv, svc_pos)
+    if fn is write_sop:
+        sop_type = argv[3]
+        write_sop(service_id, sop_type, body, tags=tags)
+    else:
+        fn(service_id, body, tags=tags)
+
+
 def _index(full=False):
     """Incremental index or full rebuild via RAG API."""
     if full:
@@ -175,7 +210,12 @@ def query(question):
         headers={"Content-Type": "application/json"},
     )
     resp = urllib.request.urlopen(req, timeout=60)
-    print(json.loads(resp.read())["answer"])
+    r = json.loads(resp.read())
+    matched = r.get("matched_by")
+    if matched:
+        path_label = {"ip": "IP精确匹配", "service_name": "服务名匹配"}.get(matched, matched)
+        print(f"[命中路径: {path_label}]")
+    print(r["answer"])
 
 
 def topology(service_id):
@@ -357,7 +397,9 @@ def add_service(args):
         print(f"错误: service_id '{svc_id}' 已存在")
         sys.exit(1)
     if not any(h["id"] == svc_host for h in data.get("hosts", [])):
-        print(f"警告: host '{svc_host}' 不存在于拓扑中，请先 add-host")
+        print(f"错误: host '{svc_host}' 不存在于拓扑中，请先 add-host")
+        print(f"  提示: ./aiops-query add-host --id {svc_host} --name <名称> --ip <IP> --os 'CentOS 7'")
+        sys.exit(1)
 
     entry = {"id": svc_id, "name": svc_name, "deploys_on": svc_host}
 
@@ -469,6 +511,23 @@ def add_host(args):
 def update_node(label: str, node_id: str, key: str, value: str):
     """Update any node property via PATCH /node/{label}/{id}.
     Labels: Service, Host, Port, Document, Cluster."""
+    if label not in _NODE_PROPS:
+        print(f"错误: 未知 Label '{label}'。有效: {list(_NODE_PROPS.keys())}")
+        sys.exit(1)
+    if key not in _NODE_PROPS[label]:
+        hint = _PROP_HINTS.get(key)
+        if hint:
+            print(f"错误: {hint}")
+        else:
+            # 找出 key 实际属于哪些 Label（可能多个，如 name 同时属于 Service/Host/Cluster）
+            matching_labels = [lbl for lbl, props in _NODE_PROPS.items() if key in props]
+            if matching_labels:
+                print(f"错误: '{key}' 是 {', '.join(matching_labels)} 的属性，不是 {label} 的。")
+                print(f"  试试: aiops-query update-node {matching_labels[0]} <node_id> {key} <value>")
+            else:
+                print(f"错误: '{key}' 不是 {label} 的有效属性。")
+                print(f"  {label} 支持的属性: {sorted(_NODE_PROPS[label])}")
+        sys.exit(1)
     import urllib.request, urllib.error
     # Auto-convert numeric values
     try:
