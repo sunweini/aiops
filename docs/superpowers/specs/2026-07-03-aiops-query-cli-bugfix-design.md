@@ -115,7 +115,7 @@ if not any(h["id"] == svc_host for h in data.get("hosts", [])):
 ```python
 if not any(h["id"] == svc_host for h in data.get("hosts", [])):
     print(f"错误: host '{svc_host}' 不存在于拓扑中，请先 add-host")
-    print(f"  提示: ./aiops-query add-host --id {svc_host} --name <名称> --ip <IP>")
+    print(f"  提示: ./aiops-query add-host --id {svc_host} --name <名称> --ip <IP> --os 'CentOS 7'")
     sys.exit(1)
 ```
 
@@ -132,6 +132,13 @@ if not any(h["id"] == svc_host for h in data.get("hosts", [])):
   name: dbm1
   ip: 10.33.16.144
   os: CentOS 7
+```
+
+**插入位置**：`hosts` 列表末尾（`host_pangu_db_slave` 条目之后）。可直接编辑 `wiki/topology/call-graph.yml`，或用 `add-host` 命令补录（但需先临时移除 `svc_pangu_db` 的悬空引用，否则 `reload-topology` 仍会校验失败）—— 推荐直接编辑 YAML 更稳妥。
+
+**YAML 格式验证**（编辑后必须执行）：
+```bash
+python3 -c "import yaml; yaml.safe_load(open('wiki/topology/call-graph.yml')); print('YAML 格式正确')"
 ```
 
 修复后验证：
@@ -210,6 +217,8 @@ _PROP_HINTS = {
 }
 ```
 
+> **扩展性说明**：`_PROP_HINTS` 目前只包含 `vip`/`role`/`ports` 三个高频误用属性。后续可根据用户反馈补充更多常见误用（如 `status`、`description` 等跨 Label 共有属性的误用场景）。新增条目时同步更新 `SKILL.md` 的"update-node 支持的属性"章节。
+
 #### 3b. `update_node` 改造（PATCH 前加本地校验）
 
 ```python
@@ -222,12 +231,11 @@ def update_node(label, node_id, key, value):
         if hint:
             print(f"错误: {hint}")
         else:
-            # 找出 key 实际属于哪个 Label
-            for lbl, props in _NODE_PROPS.items():
-                if key in props:
-                    print(f"错误: '{key}' 是 {lbl} 的属性，不是 {label} 的。")
-                    print(f"  试试: aiops-query update-node {lbl} <node_id> {key} <value>")
-                    break
+            # 找出 key 实际属于哪些 Label（可能多个，如 name 同时属于 Service/Host/Cluster）
+            matching_labels = [lbl for lbl, props in _NODE_PROPS.items() if key in props]
+            if matching_labels:
+                print(f"错误: '{key}' 是 {', '.join(matching_labels)} 的属性，不是 {label} 的。")
+                print(f"  试试: aiops-query update-node {matching_labels[0]} <node_id> {key} <value>")
             else:
                 print(f"错误: '{key}' 不是 {label} 的有效属性。")
                 print(f"  {label} 支持的属性: {sorted(_NODE_PROPS[label])}")
@@ -394,6 +402,51 @@ curl -X POST http://localhost:8001/api/v1/reload-topology
 - `./aiops-query query 'nginx 502 排查'` — 知识库问答不受影响
 - `./aiops-query topology svc_nginx_company` — 拓扑查询不受影响
 - `./aiops-query health` — 健康检查恢复正常（数据修复后）
+
+---
+
+## 回滚方案
+
+修复后若出现问题，按以下顺序回滚：
+
+1. **代码回滚**：`git revert <commit-hash>` 撤销对应 commit（CLI 脚本 / SKILL.md 各自独立 revert）
+2. **数据回滚**：从 git 恢复 `call-graph.yml`
+   ```bash
+   git checkout HEAD~1 -- rag/wiki/topology/call-graph.yml
+   curl -X POST http://localhost:8001/api/v1/reload-topology
+   ```
+   注意：数据回滚会重新引入悬空引用（`svc_pangu_db` → `host_pangu_db_master`），`/reload-topology` 会再次校验失败 —— 这是回滚到修复前状态，可接受。
+3. **部署回滚**：从 git 源重新 `cp` 到部署目录
+   ```bash
+   cp rag/skills/aiops-query ~/.openclaw/skills/aiops-rag/aiops-query
+   cp rag/skills/SKILL.md ~/.openclaw/skills/aiops-rag/SKILL.md
+   chmod +x ~/.openclaw/skills/aiops-rag/aiops-query
+   ```
+4. **验证回滚成功**：跑一次 `./aiops-query health` 确认服务状态
+
+## 监控指标
+
+修复上线后观察以下指标（持续 1-2 周）：
+
+| 指标 | 采集方式 | 期望值 |
+|------|---------|--------|
+| `add-service` 报错退出次数 | 人工观察 / 日志 | > 0（说明用户尝试创建悬空引用被拦截，符合预期） |
+| `update-node` CLI 端报错次数 | 人工观察 | 减少（友好提示让用户改用正确 Label） |
+| `/reload-topology` 成功率 | `curl` + 检查返回 | 恢复 100%（数据修复后校验通过） |
+| Neo4j 数据一致性 | `./aiops-query health` 的 sync 字段 | 无 orphan_docs / dangling_doc_refs |
+| `write-tech`/`write-sop`/`write-incident` 成功率 | 人工执行验证命令 | 100%（Bug 1 修复后） |
+
+若 `/reload-topology` 仍失败，说明 YAML 还有其他悬空引用未修复，需排查 `validate_cross_refs` 报错。
+
+## 用户通知
+
+修复合并后通知用户：
+
+1. **SKILL.md 更新日志**：在 `SKILL.md` 末尾新增"变更记录"章节（若不存在），记录：
+   - `add-service` 现在强制校验 host 存在性（行为变更）
+   - `update-node` 新增属性校验和友好提示
+   - `write-tech`/`write-sop`/`write-incident` 修复
+2. **团队通知**：在团队群说明三个 Bug 已修复，命令用法基本不变，唯一行为变化是 `add-service` 在 host 不存在时报错退出（之前是警告）。
 
 ---
 
