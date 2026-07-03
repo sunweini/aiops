@@ -15,3 +15,13 @@ def test_allowed_props_service_includes_aliases():
     from app.schema import ALLOWED_PROPS
     assert "aliases" in ALLOWED_PROPS["Service"], \
         f"aliases not in ALLOWED_PROPS Service: {ALLOWED_PROPS['Service']}"
+
+
+def test_topology_schema_includes_aliases():
+    """TOPOLOGY_SCHEMA service properties must include 'aliases' array."""
+    from app.schema import TOPOLOGY_SCHEMA
+    service_props = TOPOLOGY_SCHEMA["properties"]["services"]["items"]["properties"]
+    assert "aliases" in service_props, \
+        f"aliases not in TOPOLOGY_SCHEMA service properties: {list(service_props.keys())}"
+    assert service_props["aliases"]["type"] == "array"
+    assert service_props["aliases"]["items"]["type"] == "string"

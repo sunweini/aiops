@@ -3,6 +3,18 @@ import pytest
 from unittest.mock import MagicMock, patch
 import time
 
+import app.router.service_resolver as sr_module
+
+
+@pytest.fixture(autouse=True)
+def _reset_alias_cache():
+    """Reset module-level alias cache before each test."""
+    sr_module._alias_map_cache = None
+    sr_module._alias_map_loaded_at = 0
+    yield
+    sr_module._alias_map_cache = None
+    sr_module._alias_map_loaded_at = 0
+
 
 def _make_mock_driver(host_records=None, service_records=None, sop_records=None):
     """Build mock Neo4j driver with configurable responses per query."""
@@ -133,15 +145,16 @@ class TestAliasMapCache:
             {"id": "svc_es", "name": "es", "aliases": ["es"]},
         ])
         resolver = ServiceResolver(mock_driver, MagicMock())
-        resolver.CACHE_TTL = 300
 
         # First call loads
         map1 = resolver.get_alias_map()
         assert "svc_es" in map1
 
         # Second call should use cache (no additional Neo4j queries)
+        call_count_after_first = mock_driver._test_session.run.call_count
         map2 = resolver.get_alias_map()
         assert map2 == map1
+        assert mock_driver._test_session.run.call_count == call_count_after_first
 
     def test_cache_expired_after_ttl(self):
         from app.router.service_resolver import ServiceResolver
@@ -149,11 +162,34 @@ class TestAliasMapCache:
             {"id": "svc_es", "name": "es", "aliases": ["es"]},
         ])
         resolver = ServiceResolver(mock_driver, MagicMock())
-        resolver.CACHE_TTL = 0  # Expire immediately
 
-        resolver.get_alias_map()
-        time.sleep(0.01)
-        resolver.get_alias_map()  # Should reload
+        # Force TTL to 0 by patching module-level constant
+        original_ttl = sr_module._ALIAS_CACHE_TTL
+        sr_module._ALIAS_CACHE_TTL = 0
+        try:
+            resolver.get_alias_map()
+            call_count_after_first = mock_driver._test_session.run.call_count
+            time.sleep(0.01)
+            resolver.get_alias_map()  # Should reload
 
-        # Verify Neo4j was queried twice
-        assert mock_driver._test_session.run.call_count >= 2
+            # Verify Neo4j was queried again
+            assert mock_driver._test_session.run.call_count > call_count_after_first
+        finally:
+            sr_module._ALIAS_CACHE_TTL = original_ttl
+
+    def test_cache_persists_across_instances(self):
+        """Module-level cache should be shared across ServiceResolver instances."""
+        from app.router.service_resolver import ServiceResolver
+        mock_driver = _make_mock_driver(service_records=[
+            {"id": "svc_shared", "name": "shared", "aliases": ["shared"]},
+        ])
+
+        resolver1 = ServiceResolver(mock_driver, MagicMock())
+        map1 = resolver1.get_alias_map()
+        call_count_after_first = mock_driver._test_session.run.call_count
+
+        # Create a new instance — should use cached map, not query Neo4j again
+        resolver2 = ServiceResolver(mock_driver, MagicMock())
+        map2 = resolver2.get_alias_map()
+        assert map2 == map1
+        assert mock_driver._test_session.run.call_count == call_count_after_first

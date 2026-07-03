@@ -703,6 +703,37 @@ def get_service_sops(driver, service_id: str) -> list[dict]:
         return []
 
 
+def get_service_sops_batch(driver, service_ids: list[str]) -> list[dict]:
+    """Get SOP documents for multiple services in a single query.
+    Returns [{doc_id, title, doc_type, updated_at}] deduplicated by doc_id."""
+    if not service_ids:
+        return []
+    try:
+        with driver.session() as session:
+            result = session.run(
+                """
+                MATCH (s:Service)-[:HAS_DOC]->(d:Document {type: 'sop'})
+                WHERE s.id IN $service_ids
+                RETURN d.id AS doc_id, d.title AS title, d.type AS doc_type,
+                       d.updated_at AS updated_at
+                ORDER BY d.updated_at DESC
+                """,
+                service_ids=service_ids,
+            )
+            # Deduplicate by doc_id (a doc may be linked to multiple services)
+            seen = set()
+            unique = []
+            for r in result.data():
+                doc_id = r["doc_id"]
+                if doc_id not in seen:
+                    seen.add(doc_id)
+                    unique.append(r)
+            return unique
+    except Exception as e:
+        print(f"get_service_sops_batch error: {e}")
+        return []
+
+
 def resolve_host_by_ip(driver, ip: str) -> dict | None:
     """按 IP 查 Host 节点，返回 host_id 和 host_name。
     新增端点：GET /api/v1/host/resolve?ip=<ip> 的底层查询。

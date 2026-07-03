@@ -13,6 +13,7 @@ import time
 from app.retrievers.graph_retriever import (
     get_service_alias_map,
     get_service_sops,
+    get_service_sops_batch,
     resolve_host_by_ip,
     get_host_services,
 )
@@ -21,6 +22,11 @@ from app.retrievers.es_retriever import get_docs_by_ids
 # IP regex pattern
 IP_PATTERN = re.compile(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b')
 
+# Module-level alias cache (persists across ServiceResolver instances)
+_alias_map_cache: dict | None = None
+_alias_map_loaded_at: float = 0
+_ALIAS_CACHE_TTL: float = 300  # 5 minutes
+
 
 class ServiceResolver:
     """Resolves services via IP or name aliases, returns associated SOPs."""
@@ -28,9 +34,6 @@ class ServiceResolver:
     def __init__(self, driver, es_client):
         self.driver = driver
         self.es = es_client
-        self._alias_map: dict | None = None
-        self._map_loaded_at: float = 0
-        self.CACHE_TTL: float = 300  # 5 minutes
 
     @staticmethod
     def extract_ips(query: str) -> list[str]:
@@ -45,13 +48,15 @@ class ServiceResolver:
 
     def get_alias_map(self) -> dict:
         """Load service alias map from Neo4j with TTL cache.
-        Returns {service_id: {"name": str, "aliases": list[str]}}."""
+        Returns {service_id: {"name": str, "aliases": list[str]}}.
+        Cache is module-level so it persists across ServiceResolver instances."""
+        global _alias_map_cache, _alias_map_loaded_at
         now = time.time()
-        if self._alias_map is not None and (now - self._map_loaded_at) < self.CACHE_TTL:
-            return self._alias_map
-        self._alias_map = get_service_alias_map(self.driver)
-        self._map_loaded_at = now
-        return self._alias_map
+        if _alias_map_cache is not None and (now - _alias_map_loaded_at) < _ALIAS_CACHE_TTL:
+            return _alias_map_cache
+        _alias_map_cache = get_service_alias_map(self.driver)
+        _alias_map_loaded_at = now
+        return _alias_map_cache
 
     def resolve_by_ip(self, ip: str) -> list[str]:
         """IP → host → service_ids. Returns list of service_ids on that host."""
@@ -101,11 +106,11 @@ class ServiceResolver:
     def get_service_sops_with_tags(self, service_ids: list[str]) -> list[dict]:
         """Fetch SOP docs for services, with tags from ES for sorting.
         Returns [{doc_id, title, doc_type, tags, content, service_ids}]."""
-        # Get SOP doc_ids from Neo4j
-        neo4j_sops = []
-        for sid in service_ids:
-            sops = get_service_sops(self.driver, sid)
-            neo4j_sops.extend(sops)
+        if not service_ids:
+            return []
+
+        # Get SOP doc_ids from Neo4j in a single batch query
+        neo4j_sops = get_service_sops_batch(self.driver, service_ids)
 
         if not neo4j_sops:
             return []

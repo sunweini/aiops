@@ -49,6 +49,7 @@ TOPOLOGY_SCHEMA = {
                         },
                     },
                     "ports": {"type": "array", "items": {"type": "integer"}},
+                    "aliases": {"type": "array", "items": {"type": "string"}},
                 },
             },
         },

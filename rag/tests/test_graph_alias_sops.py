@@ -110,3 +110,54 @@ class TestGetServiceSops:
         result = get_service_sops(mock_driver, "svc_es")
 
         assert result == []
+
+
+class TestGetServiceSopsBatch:
+    def test_returns_sops_for_multiple_services(self):
+        """Batch query returns SOPs across multiple services."""
+        records = [
+            {"doc_id": "sop-es-9200", "title": "ES 9200 SOP", "doc_type": "sop", "updated_at": "2024-06-01"},
+            {"doc_id": "sop-nginx-80", "title": "Nginx 80 SOP", "doc_type": "sop", "updated_at": "2024-05-01"},
+        ]
+        driver = _make_mock_driver(records)
+
+        from app.retrievers.graph_retriever import get_service_sops_batch
+        result = get_service_sops_batch(driver, ["svc_es", "svc_nginx"])
+
+        assert len(result) == 2
+        doc_ids = [r["doc_id"] for r in result]
+        assert "sop-es-9200" in doc_ids
+        assert "sop-nginx-80" in doc_ids
+
+    def test_deduplicates_by_doc_id(self):
+        """Same doc linked to multiple services is returned only once."""
+        records = [
+            {"doc_id": "sop-shared", "title": "Shared SOP", "doc_type": "sop", "updated_at": "2024-06-01"},
+            {"doc_id": "sop-shared", "title": "Shared SOP", "doc_type": "sop", "updated_at": "2024-06-01"},
+        ]
+        driver = _make_mock_driver(records)
+
+        from app.retrievers.graph_retriever import get_service_sops_batch
+        result = get_service_sops_batch(driver, ["svc_a", "svc_b"])
+
+        assert len(result) == 1
+        assert result[0]["doc_id"] == "sop-shared"
+
+    def test_empty_service_ids_returns_empty(self):
+        """Empty input returns empty output without querying Neo4j."""
+        driver = _make_mock_driver([])
+
+        from app.retrievers.graph_retriever import get_service_sops_batch
+        result = get_service_sops_batch(driver, [])
+
+        assert result == []
+
+    def test_exception_returns_empty(self):
+        """Neo4j error returns empty list."""
+        mock_driver = MagicMock()
+        mock_driver.session.side_effect = Exception("timeout")
+
+        from app.retrievers.graph_retriever import get_service_sops_batch
+        result = get_service_sops_batch(mock_driver, ["svc_es"])
+
+        assert result == []

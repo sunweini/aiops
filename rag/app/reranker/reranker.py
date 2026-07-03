@@ -18,7 +18,7 @@ def reciprocal_rank_fusion(result_lists: list[list[dict]], top_k: int = 20) -> l
     seen = {}  # key -> {item, rrf_score}
     for rank_list in result_lists:
         for rank, item in enumerate(rank_list, start=1):
-            key = "".join(item.get("service_ids", [])) + item.get("doc_type", "") + item.get("title", "")
+            key = f"{item.get('doc_type', '')}|{'|'.join(item.get('service_ids', []))}|{item.get('title', '')}"
             if key not in seen:
                 seen[key] = {"item": item, "rrf_score": 0.0}
             seen[key]["rrf_score"] += 1.0 / (RRF_K + rank)
