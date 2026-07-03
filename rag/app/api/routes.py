@@ -29,6 +29,7 @@ from app.retrievers.graph_retriever import (
 )
 from app.reranker.reranker import merge_and_rerank
 from app.router.query_rewriter import rewrite_and_extract
+from app.router.service_resolver import ServiceResolver
 from app.config import settings
 
 router = APIRouter()
@@ -105,6 +106,34 @@ async def _call_llm(messages: list[dict]) -> str:
 async def query(req: QueryRequest):
     """Multi-engine retrieval with graph enrichment, cluster awareness, degraded handling."""
 
+    # ── Pre-check: Path A (IP) and Path B (service name) ──
+    try:
+        es = get_es_client()
+        driver = get_driver()
+        resolver = ServiceResolver(driver, es)
+
+        # Path A: IP → host → service → SOP
+        path_a = resolver.try_path_a(req.query, req.top_k)
+        if path_a:
+            return QueryResponse(
+                answer=path_a["answer"],
+                sources=path_a["sources"],
+                matched_by=path_a["matched_by"],
+            )
+
+        # Path B: jieba → alias → service → SOP
+        path_b = resolver.try_path_b(req.query, req.top_k)
+        if path_b:
+            return QueryResponse(
+                answer=path_b["answer"],
+                sources=path_b["sources"],
+                matched_by=path_b["matched_by"],
+            )
+    except Exception as e:
+        print(f"Multi-recall pre-check failed: {e}")
+        # Fall through to Path C
+
+    # ── Path C: Existing LLM pipeline (unchanged) ──
     # Phase 1: Query analysis (single LLM call)
     rewritten, query_types, entities = await rewrite_and_extract(req.query)
     if rewritten != req.query:
