@@ -2,7 +2,7 @@
 
 # --- Neo4j node property whitelists ---
 
-SERVICE_PROPS = {"id", "name", "status", "description"}
+SERVICE_PROPS = {"id", "name", "status", "description", "aliases"}
 HOST_PROPS = {"id", "name", "ip", "os"}
 PORT_PROPS = {"number", "protocol", "status"}
 CALL_PROPS = {"protocol", "port"}
@@ -49,6 +49,7 @@ TOPOLOGY_SCHEMA = {
                         },
                     },
                     "ports": {"type": "array", "items": {"type": "integer"}},
+                    "aliases": {"type": "array", "items": {"type": "string"}},
                 },
             },
         },

@@ -102,7 +102,7 @@ def load_topology(filepath: str):
         if unknown:
             print(f"  警告: host '{h['id']}' 包含未知字段将被忽略: {unknown}")
     for s in data.get("services", []):
-        unknown = set(s.keys()) - SERVICE_PROPS - {"deploys_on", "calls", "ports", "cluster_nodes"}
+        unknown = set(s.keys()) - SERVICE_PROPS - {"deploys_on", "calls", "ports", "cluster_nodes", "aliases"}
         if unknown:
             print(f"  警告: service '{s['id']}' 包含未知字段将被忽略: {unknown}")
 
@@ -123,9 +123,10 @@ def load_topology(filepath: str):
             )
 
         for s in services:
+            aliases = s.get("aliases", [])
             session.run(
-                "MERGE (svc:Service {id: $id}) SET svc.name = $name",
-                id=s["id"], name=s.get("name", ""),
+                "MERGE (svc:Service {id: $id}) SET svc.name = $name, svc.aliases = $aliases",
+                id=s["id"], name=s.get("name", ""), aliases=aliases,
             )
 
         # PASS 2: Create relationships

@@ -22,6 +22,7 @@ class QueryResponse(BaseModel):
     degraded: bool = False
     missing_components: list[str] = []
     gap_warning: Optional[str] = None
+    matched_by: Optional[str] = None  # "ip", "service_name", "fulltext", "vector", "none"
 
 
 class TopologyRequest(BaseModel):

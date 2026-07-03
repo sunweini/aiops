@@ -94,13 +94,44 @@ def _regex_extract_entities(query: str) -> dict:
     return entities
 
 
+_INCIDENT_KEYWORDS = {"502", "503", "504", "超时", "报错", "连不上", "异常", "错误", "故障", "失败", "down", "error", "timeout", "refused"}
+_TOPOLOGY_KEYWORDS = {"部署", "在哪", "拓扑", "依赖", "调用", "机器", "服务器", "端口"}
+
+
+def _fallback_classify_intent(query: str) -> list[str]:
+    """Keyword-based intent classification for LLM fallback.
+    Returns list of intent types, default ['sop']."""
+    query_lower = query.lower()
+    types = []
+
+    for kw in _INCIDENT_KEYWORDS:
+        if kw in query_lower:
+            types.append("incident")
+            break
+
+    for kw in _TOPOLOGY_KEYWORDS:
+        if kw in query_lower:
+            types.append("topology")
+            break
+
+    # Check for IP (implies topology interest)
+    if IP_PATTERN.search(query):
+        if "topology" not in types:
+            types.append("topology")
+
+    if not types:
+        types = ["sop"]
+
+    return types
+
+
 async def rewrite_and_extract(query: str) -> tuple[str, list[str], dict]:
     """One LLM call: rewrite + classify + extract entities.
     Returns (rewritten_query, types_list, entities_dict).
     Falls back to regex entity extraction on LLM error."""
     key = _api_key()
     if not key:
-        return query, ["sop"], _regex_extract_entities(query)
+        return query, _fallback_classify_intent(query), _regex_extract_entities(query)
 
     payload = {
         "model": settings.llm_model,
@@ -149,7 +180,7 @@ async def rewrite_and_extract(query: str) -> tuple[str, list[str], dict]:
             merged_entities[key] = llm_val if llm_val else regex_val
 
         if not r_query or len(r_query) < 2 or not r_types:
-            return query, ["sop"], merged_entities
+            return query, _fallback_classify_intent(query), merged_entities
 
         return r_query, r_types, merged_entities
 
@@ -160,7 +191,7 @@ async def rewrite_and_extract(query: str) -> tuple[str, list[str], dict]:
             inc_metric("entity_extract_fallback_total")
         except Exception:
             pass
-        return query, ["sop"], _regex_extract_entities(query)
+        return query, _fallback_classify_intent(query), _regex_extract_entities(query)
 
 
 async def rewrite_query(query: str) -> tuple[str, list[str]]:

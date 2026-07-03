@@ -26,16 +26,62 @@ def test_regex_multiple_ips_gets_first():
 
 @pytest.mark.asyncio
 async def test_rewrite_fallback_no_api_key():
-    """Without API key, rewrite returns original + sop + regex entities."""
+    """Without API key, rewrite returns original + regex entities."""
     from app.router.query_rewriter import rewrite_and_extract
     import os
     saved_key = os.environ.get("LLM_API_KEY", "")
     os.environ.pop("LLM_API_KEY", None)
     try:
-        rewritten, types, entities = await rewrite_and_extract("10.33.16.42 nginx 502")
-        assert rewritten == "10.33.16.42 nginx 502"
+        rewritten, types, entities = await rewrite_and_extract("怎么扩容磁盘")
+        assert rewritten == "怎么扩容磁盘"
         assert "sop" in types
-        assert entities["host_ip"] == "10.33.16.42"
+        assert entities["host_ip"] == ""
+    finally:
+        if saved_key:
+            os.environ["LLM_API_KEY"] = saved_key
+
+
+@pytest.mark.asyncio
+async def test_rewrite_fallback_incident_keywords():
+    """With query containing incident keywords, fallback should classify as incident."""
+    from app.router.query_rewriter import rewrite_and_extract
+    import os
+    saved_key = os.environ.get("LLM_API_KEY", "")
+    os.environ.pop("LLM_API_KEY", None)
+    try:
+        rewritten, types, entities = await rewrite_and_extract("nginx 502 超时连不上")
+        assert "incident" in types, f"Expected 'incident' in types: {types}"
+    finally:
+        if saved_key:
+            os.environ["LLM_API_KEY"] = saved_key
+
+
+@pytest.mark.asyncio
+async def test_rewrite_fallback_topology_with_ip():
+    """With query containing IP, fallback should include topology intent."""
+    from app.router.query_rewriter import rewrite_and_extract
+    import os
+    saved_key = os.environ.get("LLM_API_KEY", "")
+    os.environ.pop("LLM_API_KEY", None)
+    try:
+        rewritten, types, entities = await rewrite_and_extract("10.33.16.42 部署在哪")
+        assert "topology" in types or "incident" in types, \
+            f"Expected topology or incident in types: {types}"
+    finally:
+        if saved_key:
+            os.environ["LLM_API_KEY"] = saved_key
+
+
+@pytest.mark.asyncio
+async def test_rewrite_fallback_default_sop():
+    """With no special keywords, fallback defaults to sop."""
+    from app.router.query_rewriter import rewrite_and_extract
+    import os
+    saved_key = os.environ.get("LLM_API_KEY", "")
+    os.environ.pop("LLM_API_KEY", None)
+    try:
+        rewritten, types, entities = await rewrite_and_extract("怎么扩容磁盘")
+        assert "sop" in types
     finally:
         if saved_key:
             os.environ["LLM_API_KEY"] = saved_key
