@@ -30,6 +30,14 @@ chmod +x ~/.openclaw/workspace-shared/aiops/rag/skills/aiops-query
 | 命令 | 用途 | 示例 |
 |------|------|------|
 | `aiops-query query '<问题>'` | 知识库问答（最常用） | `aiops-query query 'nginx 502 排查'` |
+
+> **query 多路召回机制**：query 命令会自动识别输入中的 IP 和服务名别名，优先走精确匹配路径：
+> - **路径 A**（IP 精确匹配）：输入含 IP → 定位主机 → 找服务 → 返回 SOP，不经 LLM，最快
+> - **路径 B**（服务名别名匹配）：输入含服务名/别名 → 匹配服务 → 返回 SOP，不经 LLM
+> - **路径 C**（语义/全文兜底）：A/B 都未命中 → 走 LLM + ES + 向量检索
+>
+> 返回的 JSON 中有 `matched_by` 字段标识命中路径：`"ip"` / `"service_name"` / `null`（路径 C）。
+> 响应更快、更精准。用户可以直接用常用名称查询，不需要知道精确的 service_id。
 | `aiops-query topology <svc_id>` | 服务拓扑 | `aiops-query topology svc_nginx` |
 | `aiops-query cluster <svc_id>` | 集群拓扑（VIP+成员） | `aiops-query cluster svc_nginx_company` |
 | `aiops-query impact <host_id>` | 主机故障影响分析 | `aiops-query impact host_app_01` |
@@ -50,9 +58,26 @@ chmod +x ~/.openclaw/workspace-shared/aiops/rag/skills/aiops-query
 | `aiops-query write-sop <svc_id> <操作名> [--file <path> | '<内容>'] [--tags 'tag1,tag2']` | 写入 SOP | `aiops-query write-sop svc_nginx 重启 --file /tmp/body.md --tags '应急,高危'` |
 | `aiops-query write-tech <svc_id> [--file <path> | '<内容>'] [--tags 'tag1,tag2']` | 写入技术文档 | `aiops-query write-tech svc_nginx --file /tmp/body.md --tags 'ELK,架构'` |
 | `aiops-query write-incident <svc_id> [--file <path> | '<内容>'] [--tags 'tag1,tag2']` | 写入故障记录 | `aiops-query write-incident svc_nginx --file /tmp/body.md --tags '502,Nginx'` |
-| `aiops-query add-service --id <id> --name <名> --host <hid> [--port 8080] [--call svc_x:http:80]` | 新增服务到拓扑 | `aiops-query add-service --id svc_payment --name payment-service --host host_app_02 --port 50051 --call svc_db_mysql:tcp:3306` |
+| `aiops-query add-service --id <id> --name <名> --host <hid> [--port 8080] [--call svc_x:http:80]` | 新增服务到拓扑（host 不存在时报错退出） | `aiops-query add-service --id svc_payment --name payment-service --host host_app_02 --port 50051 --call svc_db_mysql:tcp:3306` |
 | `aiops-query delete-service <svc_id>` | 删除服务及关联文档 | `aiops-query delete-service svc_xxx` |
 | `aiops-query update-node <Label> <node_id> <key> <value>` | 更新任意节点属性 | `aiops-query update-node Host host_nginx_01 os 'Ubuntu 22.04'` |
+
+## update-node 支持的属性
+
+不同 Label 支持的属性不同，用错 Label 会报错并给出提示：
+
+| Label | 支持的属性 | 节点标识字段 |
+|-------|-----------|-------------|
+| Service | id, name, status, description, aliases | id |
+| Host | id, name, ip, os | id |
+| Port | number, protocol, status | number |
+| Document | id, title, type, updated_at | id |
+| Cluster | service_id, name, vip | service_id |
+
+**常见误用提示**：
+- `vip` 是 **Cluster** 的属性，不是 Service。正确：`update-node Cluster <svc_id> vip <value>`
+- `role` 是 **PART_OF 关系**的属性（host 在集群中的角色），不是 Host 节点属性，无法通过 update-node 修改
+- `ports` 在 Neo4j 里是独立 **Port** 节点（通过 `HAS_PORT` 连到 Host），不是 Service 属性
 | `aiops-query add-host --id <id> --name <名> --ip <ip> [--os 'Ubuntu']` | 新增主机 | `aiops-query add-host --id host_db_02 --name prod-db-02 --ip 10.0.2.20 --os 'Ubuntu 22.04'` |
 | `aiops-query index` | 增量重建索引 | `aiops-query index` |
 | `aiops-query index-file <path>` | 单文件索引重建 | `aiops-query index-file services/svc_k3s-k3s-cluster/tech-arch.md` |
@@ -97,8 +122,12 @@ chmod +x ~/.openclaw/workspace-shared/aiops/rag/skills/aiops-query
 | 管理中心 | svc_mgmt_center | host_mgmt (10.33.17.123) |
 | k3s-cluster | svc_k3s | host_k3s_master (10.33.16.202), host_k3s_node01 (10.33.16.203), host_k3s_node02 (10.33.16.204), host_k3s_gpu_node01 (10.33.17.234) GPU |
 | logstash-vip | svc_logstash_vip | host_logstash_vip (10.33.17.107) |
+| pangu-gateway | svc_pangu_gateway | host_pangu_gw_01 (10.33.16.139) |
+| pangu-go-services | svc_pangu_go | host_pangu_go_01 (10.33.16.16), host_pangu_go_02 (10.33.16.139) 主节点 |
+| pangu-rabbitmq | svc_pangu_mq | host_pangu_mq_01 (10.33.16.137) |
 
 > 服务名可变，service_id 不变——始终用 service_id。
+> **别名支持**：每个服务注册了中英文别名（如 svc_nginx_company 的别名包括 "nginx"、"company-nginx" 等）。用户可直接用常用名称查询，系统自动匹配。
 > 不知道 service_id 时先用 `aiops-query query '<服务名>'` 从返回的 sources 中获取。
 
 ## 文档写入流程
@@ -219,6 +248,7 @@ Agent 注册主机后必须复核以下内容，否则数据不完整：
 Agent 新增服务须先确认：
 1. service_id 以 `svc_` 开头，host_id 以 `host_` 开头
 2. **先注册 Host 再注册 Service** — 调用 `add-host` 后再 `add-service`，禁止创建引用不存在 host 的 service
+   > **强制校验**：`add-service` 已实现 host 存在性强制校验，host 不存在时直接报错退出（不再仅警告）。
 3. host 在拓扑中已存在，若不存在先 `add-host`
 4. **`--call` 参数必填** — 如果有依赖关系必须传 `--call`，禁止创建无任何调用关系的孤立服务
 5. calls 中的 target service_id 在拓扑中已存在
