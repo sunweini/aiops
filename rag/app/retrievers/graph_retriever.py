@@ -657,6 +657,52 @@ def check_sync_health(driver, es_url: str, timeout: int = 30) -> dict:
     }
 
 
+def get_service_alias_map(driver) -> dict:
+    """Load all services with their aliases from Neo4j.
+    Returns {service_id: {"name": str, "aliases": list[str]}}.
+    Used by ServiceResolver for alias-based service matching."""
+    try:
+        with driver.session() as session:
+            result = session.run(
+                """
+                MATCH (s:Service)
+                RETURN s.id AS id, s.name AS name, s.aliases AS aliases
+                """
+            )
+            records = result.data()
+            mapping = {}
+            for r in records:
+                sid = r["id"]
+                mapping[sid] = {
+                    "name": r.get("name", ""),
+                    "aliases": r.get("aliases") or [],
+                }
+            return mapping
+    except Exception as e:
+        print(f"get_service_alias_map error: {e}")
+        return {}
+
+
+def get_service_sops(driver, service_id: str) -> list[dict]:
+    """Get SOP documents linked to a service via HAS_DOC edges.
+    Returns [{doc_id, title, doc_type, updated_at}]."""
+    try:
+        with driver.session() as session:
+            result = session.run(
+                """
+                MATCH (s:Service {id: $sid})-[r:HAS_DOC]->(d:Document {type: 'sop'})
+                RETURN d.id AS doc_id, d.title AS title, d.type AS doc_type,
+                       d.updated_at AS updated_at
+                ORDER BY d.updated_at DESC
+                """,
+                sid=service_id,
+            )
+            return [dict(r) for r in result.data()]
+    except Exception as e:
+        print(f"get_service_sops error: {e}")
+        return []
+
+
 def resolve_host_by_ip(driver, ip: str) -> dict | None:
     """按 IP 查 Host 节点，返回 host_id 和 host_name。
     新增端点：GET /api/v1/host/resolve?ip=<ip> 的底层查询。
