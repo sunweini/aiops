@@ -214,6 +214,7 @@ def get_docs_by_ids(es: Elasticsearch, doc_ids: list[str], top_k: int = 50) -> l
         for hit in resp["hits"]["hits"]:
             src = hit["_source"]
             results.append({
+                "doc_id": src.get("doc_id", ""),
                 "title": src.get("title", ""),
                 "content": src.get("content", ""),
                 "score": hit["_score"],
@@ -221,6 +222,7 @@ def get_docs_by_ids(es: Elasticsearch, doc_ids: list[str], top_k: int = 50) -> l
                 "chunk_type": src.get("chunk_type", "flat"),
                 "parent_id": src.get("parent_id", ""),
                 "service_ids": src.get("service_ids", []),
+                "tags": src.get("tags", []),
                 "engine": "es",
             })
         return results
