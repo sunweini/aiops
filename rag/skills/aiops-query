@@ -136,6 +136,25 @@ def _parse_write_args(args, svc_pos):
     return body, tags
 
 
+
+def _write_cmd(argv, fn, svc_pos):
+    """分发 write-tech / write-sop / write-incident 命令。
+
+    argv: sys.argv
+    fn: write_sop / write_tech / write_incident
+    svc_pos: 最后一个位置参数的索引
+             write-sop = 3 (cmd, svc_id, sop_type)
+             write-tech / write-incident = 2 (cmd, svc_id)
+    """
+    service_id = argv[2]
+    body, tags = _parse_write_args(argv, svc_pos)
+    if fn is write_sop:
+        sop_type = argv[3]
+        write_sop(service_id, sop_type, body, tags=tags)
+    else:
+        fn(service_id, body, tags=tags)
+
+
 def _index(full=False):
     """Incremental index or full rebuild via RAG API."""
     if full:
@@ -175,7 +194,12 @@ def query(question):
         headers={"Content-Type": "application/json"},
     )
     resp = urllib.request.urlopen(req, timeout=60)
-    print(json.loads(resp.read())["answer"])
+    r = json.loads(resp.read())
+    matched = r.get("matched_by")
+    if matched:
+        path_label = {"ip": "IP精确匹配", "service_name": "服务名匹配"}.get(matched, matched)
+        print(f"[命中路径: {path_label}]")
+    print(r["answer"])
 
 
 def topology(service_id):
