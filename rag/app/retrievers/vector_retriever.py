@@ -100,7 +100,11 @@ async def search_vector(es_client, query: str, top_k: int = 5) -> list[dict]:
                 "content": src.get("content", ""),
                 "score": hit["_score"],
                 "doc_type": src.get("doc_type", ""),
-                "service_id": src.get("service_id", ""),
+                "service_ids": src.get("service_ids", []),
+                "tags": src.get("tags", []),
+                "chunk_type": src.get("chunk_type", "flat"),
+                "parent_id": src.get("parent_id", ""),
+                "doc_id": src.get("doc_id", ""),
                 "engine": "vector",
             })
         return results
