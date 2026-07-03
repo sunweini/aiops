@@ -381,7 +381,9 @@ def add_service(args):
         print(f"错误: service_id '{svc_id}' 已存在")
         sys.exit(1)
     if not any(h["id"] == svc_host for h in data.get("hosts", [])):
-        print(f"警告: host '{svc_host}' 不存在于拓扑中，请先 add-host")
+        print(f"错误: host '{svc_host}' 不存在于拓扑中，请先 add-host")
+        print(f"  提示: ./aiops-query add-host --id {svc_host} --name <名称> --ip <IP> --os 'CentOS 7'")
+        sys.exit(1)
 
     entry = {"id": svc_id, "name": svc_name, "deploys_on": svc_host}
 
